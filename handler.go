@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func Post(w http.ResponseWriter, r *http.Request) {
@@ -35,27 +36,50 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+	} else {
+		resp.Response = "Secret Salah"
+	}
+	fmt.Fprintf(w, resp.Response)
+}
+}
+func Report(w http.ResponseWriter, r *http.Request) {
+	var msg model.IteungMessage
+	var resp atmessage.Response
+	json.NewDecoder(r.Body).Decode(&msg)
+
+	if r.Header.Get("Secret") == os.Getenv("SECRET") {
+		if strings.HasPrefix(msg.Message, "report") || strings.HasPrefix(msg.Message, "Report") {
+			// Handle the reporting process here
+			// Extract the report content from the message
+			reportContent := strings.TrimPrefix(msg.Message, "report")
+			reportContent = strings.TrimPrefix(reportContent, "Report")
+			reportContent = strings.TrimSpace(reportContent)
+
+			// Send the report to the owner
+			ownerNumber := "6285312924192" // Ganti dengan nomor WhatsApp pemilik
+			reportNotification := fmt.Sprintf("🚨 New Report Received!\n📝 Report Content: %s\n📱 Reporter's Number: %s", reportContent, msg.Phone_number)
+			sendWhatsAppMessage(ownerNumber, reportNotification)
+
+			// Send acknowledgment to the reporter
+			reply := "Terima kasih! Laporan Anda telah diterima dan akan segera ditindaklanjuti."
+			sendWhatsAppMessage(msg.Phone_number, reply)
 		} else {
-			randm := []string{
-				"kamu mau ngapain kak?",
-				"genchananaaa genchanaaaayoooo",
-				"jangan begitu dong kak sabar ya",
-				"coba kamu share live lokasi kamu biar aku cek",
-				"gilarnya kayaknya gada deh tunggu aja ya",
-			}
-			dt := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: GetRandomString(randm),
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+			// Respons sederhana jika perintah bukan "report" atau "Report"
+			resp.Response = "Command tidak dikenali. Silakan gunakan perintah 'report' untuk melaporkan sesuatu."
 		}
 	} else {
 		resp.Response = "Secret Salah"
 	}
 	fmt.Fprintf(w, resp.Response)
 }
-
+func sendWhatsAppMessage(toNumber, message string) {
+	dt := &wa.TextMessage{
+		To:       toNumber,
+		IsGroup:  false,
+		Messages: message,
+	}
+	atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+}
 func ReverseGeocode(latitude, longitude float64) (string, error) {
 	// OSM Nominatim API endpoint
 	apiURL := fmt.Sprintf("https://nominatim.openstreetmap.org/reverse?format=json&lat=%f&lon=%f", latitude, longitude)
