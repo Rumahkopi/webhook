@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 )
-var whatsAuthURL = "https://api.wa.my.id/api/send/message/text"
 
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
@@ -57,7 +56,7 @@ func Report(w http.ResponseWriter, r *http.Request) {
 			reportContent = strings.TrimSpace(reportContent)
 
 			// Send the report to the owner
-			ownerNumber := "6281234567890" // Ganti dengan nomor WhatsApp pemilik
+			ownerNumber := "6285312924192" // Ganti dengan nomor WhatsApp pemilik
 			reportNotification := fmt.Sprintf("🚨 New Report Received!\n📝 Report Content: %s\n📱 Reporter's Number: %s", reportContent, msg.Phone_number)
 
 			// Send report notification to owner
@@ -66,7 +65,7 @@ func Report(w http.ResponseWriter, r *http.Request) {
 				IsGroup:  false,
 				Messages: reportNotification,
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), reportDT, whatsAuthURL)
+			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), reportDT, "https://api.wa.my.id/api/send/message/text")
 
 			// Send acknowledgment to the reporter
 			reply := "Terima kasih! Laporan Anda telah diterima dan akan segera ditindaklanjuti."
@@ -77,7 +76,7 @@ func Report(w http.ResponseWriter, r *http.Request) {
 				IsGroup:  false,
 				Messages: reply,
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT, whatsAuthURL)
+			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT,"https://api.wa.my.id/api/send/message/text")
 		} else {
 			resp.Response = "Command tidak dikenali. Silakan gunakan perintah 'report' untuk melaporkan sesuatu."
 		}
