@@ -23,7 +23,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 		if msg.Message == "loc" || msg.Message == "Loc" || msg.Message == "lokasi" || msg.LiveLoc {
 			location, err := ReverseGeocode(msg.Latitude, msg.Longitude)
 			if err != nil {
-				// Handle the error (e.g., log it) and set a default location name
 				location = "Unknown Location"
 			}
 
@@ -36,11 +35,20 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-	} else {
-		resp.Response = "Secret Salah"
+		} else if msg.Message == "hallo" || msg.Message == "Hallo" {
+			// Respond to "hallo" command
+			reply := "Hallo juga! Apa yang bisa saya bantu?"
+			dt := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+		} else {
+			resp.Response = "Secret Salah"
+		}
+		fmt.Fprintf(w, resp.Response)
 	}
-	fmt.Fprintf(w, resp.Response)
-}
 }
 // ...
 func Report(w http.ResponseWriter, r *http.Request) {
