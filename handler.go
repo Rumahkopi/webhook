@@ -75,9 +75,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 		} else {
 			resp.Response = "Secret Salah"
 		}
-		} else {
-			resp.Response = "Secret Salah"
-		}
 		fmt.Fprintf(w, resp.Response)
 	}
 }
