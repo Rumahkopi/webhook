@@ -44,27 +44,14 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else {
-			resp.Response = "Secret Salah"
-		}
-		fmt.Fprintf(w, resp.Response)
-	}
-}
-// ...
-func Report(w http.ResponseWriter, r *http.Request) {
-	var msg model.IteungMessage
-	var resp atmessage.Response
-	json.NewDecoder(r.Body).Decode(&msg)
-
-	if r.Header.Get("Secret") == os.Getenv("SECRET") {
-		if strings.HasPrefix(msg.Message, "report") || strings.HasPrefix(msg.Message, "Report") {
+		} else if strings.HasPrefix(msg.Message, "report") || strings.HasPrefix(msg.Message, "Report") {
 			// Handle the reporting process here
 			reportContent := strings.TrimPrefix(msg.Message, "report")
 			reportContent = strings.TrimPrefix(reportContent, "Report")
 			reportContent = strings.TrimSpace(reportContent)
 
 			// Send the report to the owner
-			ownerNumber := "6285312924192" // Ganti dengan nomor WhatsApp pemilik
+			ownerNumber := "6285312924192" // Replace with the owner's WhatsApp number
 			reportNotification := fmt.Sprintf("🚨 New Report Received!\n📝 Report Content: %s\n📱 Reporter's Number: %s", reportContent, msg.Phone_number)
 
 			// Send report notification to owner
@@ -86,12 +73,13 @@ func Report(w http.ResponseWriter, r *http.Request) {
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT,"https://api.wa.my.id/api/send/message/text")
 		} else {
-			resp.Response = "Command tidak dikenali. Silakan gunakan perintah 'report' untuk melaporkan sesuatu."
+			resp.Response = "Secret Salah"
 		}
-	} else {
-		resp.Response = "Secret Salah"
+		} else {
+			resp.Response = "Secret Salah"
+		}
+		fmt.Fprintf(w, resp.Response)
 	}
-	fmt.Fprintf(w, resp.Response)
 }
 func ReverseGeocode(latitude, longitude float64) (string, error) {
 	// OSM Nominatim API endpoint
