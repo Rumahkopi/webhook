@@ -12,7 +12,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"github.com/bwmarrin/discordgo"
 )
 
 func Post(w http.ResponseWriter, r *http.Request) {
