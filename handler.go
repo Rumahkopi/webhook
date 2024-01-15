@@ -11,7 +11,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	// "strings"
+	"strings"
+	"github.com/bwmarrin/discordgo"
 )
 
 func Post(w http.ResponseWriter, r *http.Request) {
@@ -44,26 +45,57 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-			} else if msg.Message == "report" || msg.Message == "Report" {
-				// Respond to "report" command
-				reportMessage := "Client sent a report:\n" +
-					"Phone Number: " + msg.Phone_number + "\n" +
-					"Message: " + msg.Message
+		} else if strings.HasPrefix(msg.Message, "report") || strings.HasPrefix(msg.Message, "Report") {
+			// Handle the reporting process here
+			reportContent := strings.TrimPrefix(msg.Message, "report")
+			reportContent = strings.TrimPrefix(reportContent, "Report")
+			reportContent = strings.TrimSpace(reportContent)
 	
-				ownerNumber := "6285312924192" // Replace with the actual owner's phone number
+			// Send the report to the Discord webhook
+			discordWebhookURL := "https://discord.com/api/webhooks/1170045069018026025/df2hxPLEoQOblNvZK3b4RxwzNp7JVtZ66nqSiRLrGBbFpxeBtbhLyH3isvEtpLOoTbKj" // Replace with your Discord webhook URL
+			reportNotification := fmt.Sprintf("🚨 New Report Received!\n📝 Report Content: %s\n📱 Reporter's Number: %s", reportContent, msg.Phone_number)
 	
-				dt := &wa.TextMessage{
-					To:       ownerNumber,
-					IsGroup:  false,
-					Messages: reportMessage,
-				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+			// Send report notification to Discord
+			err := sendToDiscordWebhook(discordWebhookURL, reportNotification)
+			if err != nil {
+				// Handle the error (e.g., log it)
+			}
 	
-			} else {
+			// Send acknowledgment to the reporter
+			reply := "Terima kasih! Laporan Anda telah diterima dan akan segera ditindaklanjuti."
+	
+			// Send acknowledgment to reporter via WhatsApp
+			ackDT := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+		} else {
 			resp.Response = "Secret Salah"
-		}
 		fmt.Fprintf(w, resp.Response)
 	}
+}
+}
+func sendToDiscordWebhook(webhookURL, message string) error {
+	// Create a new Discord session
+	dg, err := discordgo.New()
+	if err != nil {
+		return err
+	}
+
+	// Open a connection to the Discord gateway
+	err = dg.Open()
+	if err != nil {
+		return err
+	}
+	defer dg.Close()
+
+	// Send the message to the Discord webhook
+	_, err = dg.WebhookExecute(webhookURL, "", false, &discordgo.WebhookParams{
+		Content: message,
+	})
+	return err
 }
 func ReverseGeocode(latitude, longitude float64) (string, error) {
 	// OSM Nominatim API endpoint
