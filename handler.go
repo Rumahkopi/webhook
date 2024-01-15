@@ -66,15 +66,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-
-			// Send the image
-			imageDT := &wa.DocumentMessage{
-				To:      msg.Phone_number,
-				IsGroup: false,
-				URL:     "https://cdn.discordapp.com/attachments/1106210667654029422/1196482141131919461/image.png",
-				Caption: "Berikut adalah metode pembayaran:",
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), imageDT, "https://api.wa.my.id/api/send/message/document")
 		} else {
 			resp.Response = "Command not recognized"
 		}
