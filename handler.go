@@ -73,30 +73,35 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else {
 			resp.Response = "Secret Salah"
-		fmt.Fprintf(w, resp.Response)
-	}
+		}
 }
 }
 func sendToDiscordWebhook(webhookURL, message string) error {
-	// Create a new Discord session
-	dg, err := discordgo.New()
+	// Create a new HTTP POST request to the Discord webhook
+	req, err := http.NewRequest("POST", webhookURL, strings.NewReader(fmt.Sprintf(`{"content": "%s"}`, message)))
 	if err != nil {
 		return err
 	}
 
-	// Open a connection to the Discord gateway
-	err = dg.Open()
+	// Set the Content-Type header
+	req.Header.Set("Content-Type", "application/json")
+
+	// Perform the HTTP request
+	client := http.DefaultClient
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer dg.Close()
+	defer resp.Body.Close()
 
-	// Send the message to the Discord webhook
-	_, err = dg.WebhookExecute(webhookURL, "", false, &discordgo.WebhookParams{
-		Content: message,
-	})
-	return err
+	// Check the response status
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("non-OK status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }
+
 func ReverseGeocode(latitude, longitude float64) (string, error) {
 	// OSM Nominatim API endpoint
 	apiURL := fmt.Sprintf("https://nominatim.openstreetmap.org/reverse?format=json&lat=%f&lon=%f", latitude, longitude)
