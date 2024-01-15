@@ -50,7 +50,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					"Phone Number: " + msg.Phone_number + "\n" +
 					"Message: " + msg.Message
 	
-				ownerNumber := "+6285312924192" // Replace with the actual owner's phone number
+				ownerNumber := "6285312924192" // Replace with the actual owner's phone number
 	
 				dt := &wa.TextMessage{
 					To:       ownerNumber,
