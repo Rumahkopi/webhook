@@ -17,8 +17,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 	var resp atmessage.Response
 	json.NewDecoder(r.Body).Decode(&msg)
 
-	// Your existing code...
-
 	if r.Header.Get("Secret") == os.Getenv("SECRET") {
 		if strings.ToLower(msg.Message) == "ada masalah" {
 			// Respond to "ada masalah" command
@@ -35,15 +33,19 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
 			complaintContent = strings.TrimSpace(complaintContent)
 
-			// Forward the complaint to the admin's phone number
-			adminPhoneNumber := "6283174845017"  // Replace with the actual admin's phone number
-			forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: %s", complaintContent, msg.Phone_number)
-			forwardDT := &wa.TextMessage{
-				To:       adminPhoneNumber,
-				IsGroup:  false,
-				Messages: forwardMessage,
+			// List of admin phone numbers
+			adminPhoneNumbers := []string{"6283174845017", "6281234567890"} // Add more admin numbers as needed
+
+			// Forward the complaint to all admin phone numbers
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: %s", complaintContent, msg.Phone_number)
+				forwardDT := &wa.TextMessage{
+					To:       adminPhoneNumber,
+					IsGroup:  false,
+					Messages: forwardMessage,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 
 			// Send acknowledgment to the user
 			reply := "Terimakasih!!. Keluhan Anda telah kami terima. Silahkan tunggu respon dari admin Rumah Kopi dalam waktu 1 x 24 jam."
@@ -53,6 +55,27 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+		} else if strings.ToLower(msg.Message) == "!beli" {
+			// Respond to the "!beli" command
+			reply := "Silahkan pilih metode pembayaran:\n1. BCA\n2. Dana\n3. Gopay"
+
+			// Send payment methods to the user
+			dt := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+
+			// Send the image
+			imageDT := &wa.ImageMessage{
+				To:      msg.Phone_number,
+				IsGroup: false,
+				URL:     "https://cdn.discordapp.com/attachments/1106210667654029422/1196482141131919461/image.png",
+				Caption: "Berikut adalah metode pembayaran:",
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), imageDT, "https://api.wa.my.id/api/send/message/image")
+
 		} else {
 			resp.Response = "Command not recognized"
 		}
