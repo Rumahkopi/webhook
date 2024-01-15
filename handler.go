@@ -55,19 +55,20 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-		} else if strings.ToLower(msg.Message) == "beli" {
-			// Respond to the "beli" command
-			reply := "Silahkan pilih metode pembayaran:\n1. BCA\n2. Dana\n3. Gopay"
-
-			// Send payment methods to the user
-			dt := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: reply,
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli ") {
+				// Handle the "beli [text client]" command
+				clientText := strings.TrimPrefix(strings.ToLower(msg.Message), "beli ")
+				reply := fmt.Sprintf("Anda akan membayar %s melalui metode pembayaran berikut:\n1. BCA\n2. Dana\n3. Gopay", clientText)
+	
+				// Send payment information to the user
+				dt := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: reply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				resp.Response = "Command not recognized"
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else {
-			resp.Response = "Command not recognized"
 		}
 	}
-}
