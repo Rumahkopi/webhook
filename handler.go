@@ -34,7 +34,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			complaintContent = strings.TrimSpace(complaintContent)
 
 			// List of admin phone numbers
-			adminPhoneNumbers := []string{"6283174845017", "6281234567890"} // Add more admin numbers as needed
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
 
 			// Forward the complaint to all admin phone numbers
 			for _, adminPhoneNumber := range adminPhoneNumbers {
@@ -55,8 +55,8 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-		} else if strings.ToLower(msg.Message) == "!beli" {
-			// Respond to the "!beli" command
+		} else if strings.ToLower(msg.Message) == "beli" {
+			// Respond to the "beli" command
 			reply := "Silahkan pilih metode pembayaran:\n1. BCA\n2. Dana\n3. Gopay"
 
 			// Send payment methods to the user
