@@ -7,10 +7,8 @@ import (
 	"github.com/aiteung/atmessage"
 	"github.com/aiteung/module/model"
 	"github.com/whatsauth/wa"
-	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -22,7 +20,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 	// Your existing code...
 
 	if r.Header.Get("Secret") == os.Getenv("SECRET") {
-		if msg.message == "ada masalah" {
+		if strings.ToLower(msg.Message) == "ada masalah" {
 			// Respond to "ada masalah" command
 			reply := "Silahkan tuliskan keluhan dan masalah Anda."
 			dt := &wa.TextMessage{
