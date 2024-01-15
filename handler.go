@@ -55,20 +55,44 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli ") {
-				// Handle the "beli [text client]" command
-				clientText := strings.TrimPrefix(strings.ToLower(msg.Message), "beli ")
-				reply := fmt.Sprintf("Anda akan membayar %s melalui metode pembayaran berikut:\n1. BCA\n2. Dana\n3. Gopay", clientText)
-	
-				// Send payment information to the user
-				dt := &wa.TextMessage{
-					To:       msg.Phone_number,
-					IsGroup:  false,
-					Messages: reply,
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli ") {
+			// Handle the "beli [text client]" command
+			clientText := strings.TrimPrefix(strings.ToLower(msg.Message), "beli ")
+			reply := fmt.Sprintf("Anda akan membayar %s melalui metode pembayaran berikut:\n1. BCA\n2. Dana\n3. Gopay", clientText)
+
+			// Send payment information to the user
+			dt := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+		} else if strings.ToLower(msg.Message) == "fixbayar" {
+			// Respond to the "fixbayar" command
+			reply := "Silahkan kirim hasil screenshotan pembayaran beserta teks 'Sudah Bayar'."
+
+			// Send instructions to the user
+			dt := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+		} else {
+			// Check if the message contains an image
+			if msg.Type == "image" {
+				// Forward the image to all admin phone numbers
+				for _, adminPhoneNumber := range adminPhoneNumbers {
+					forwardImage := &wa.ImageMessage{
+						To:   adminPhoneNumber,
+						Type: "image",
+						URL:  msg.URL,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardImage, "https://api.wa.my.id/api/send/message/image")
 				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 			} else {
 				resp.Response = "Command not recognized"
 			}
 		}
 	}
+}
