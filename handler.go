@@ -44,35 +44,22 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else if strings.HasPrefix(msg.Message, "report") || strings.HasPrefix(msg.Message, "Report") {
-			// Handle the reporting process here
-			reportContent := strings.TrimPrefix(msg.Message, "report")
-			reportContent = strings.TrimPrefix(reportContent, "Report")
-			reportContent = strings.TrimSpace(reportContent)
-
-			// Send the report to the owner
-			ownerNumber := "6285312924192" // Replace with the owner's WhatsApp number
-			reportNotification := fmt.Sprintf("🚨 New Report Received!\n📝 Report Content: %s\n📱 Reporter's Number: %s", reportContent, msg.Phone_number)
-
-			// Send report notification to owner
-			reportDT := &wa.TextMessage{
-				To:       ownerNumber,
-				IsGroup:  false,
-				Messages: reportNotification,
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), reportDT, "https://api.wa.my.id/api/send/message/text")
-
-			// Send acknowledgment to the reporter
-			reply := "Terima kasih! Laporan Anda telah diterima dan akan segera ditindaklanjuti."
-
-			// Send acknowledgment to reporter
-			ackDT := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: reply,
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT,"https://api.wa.my.id/api/send/message/text")
-		} else {
+			} else if msg.Message == "report" || msg.Message == "Report" {
+				// Respond to "report" command
+				reportMessage := "Client sent a report:\n" +
+					"Phone Number: " + msg.Phone_number + "\n" +
+					"Message: " + msg.Message
+	
+				ownerNumber := "+6285312924192" // Replace with the actual owner's phone number
+	
+				dt := &wa.TextMessage{
+					To:       ownerNumber,
+					IsGroup:  false,
+					Messages: reportMessage,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+	
+			} else {
 			resp.Response = "Secret Salah"
 		}
 		fmt.Fprintf(w, resp.Response)
