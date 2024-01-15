@@ -18,63 +18,49 @@ func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
 	var resp atmessage.Response
 	json.NewDecoder(r.Body).Decode(&msg)
-	link := "https://medium.com/@gilarwahibul/whatsauth-free-2fa-otp-notif-whatsapp-gateway-api-gratis-ab4d04f80601"
-	if r.Header.Get("Secret") == os.Getenv("SECRET") {
-		if msg.Message == "loc" || msg.Message == "Loc" || msg.Message == "lokasi" || msg.LiveLoc {
-			location, err := ReverseGeocode(msg.Latitude, msg.Longitude)
-			if err != nil {
-				location = "Unknown Location"
-			}
 
-			reply := fmt.Sprintf("Hai hai haiii kamu pasti lagi di %s \n Koordinatenya : %s - %s\n Cara Penggunaan WhatsAuth Ada di link dibawah ini"+
-				"yaa kak %s\n", location,
-				strconv.Itoa(int(msg.Longitude)), strconv.Itoa(int(msg.Latitude)), link)
+	// Your existing code...
+
+	if r.Header.Get("Secret") == os.Getenv("SECRET") {
+		if strings.ToLower(msg.Message) == "Ada masalah" {
+			// Respond to "ada masalah" command
+			reply := "Silahkan tuliskan keluhan dan masalah Anda."
 			dt := &wa.TextMessage{
 				To:       msg.Phone_number,
 				IsGroup:  false,
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else if msg.Message == "hallo" || msg.Message == "Hallo" {
-			// Respond to "hallo" command
-			reply := "Hallo juga! Apa yang bisa saya bantu?"
-			dt := &wa.TextMessage{
-				To:       msg.Phone_number,
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "keluhan") || strings.HasPrefix(strings.ToLower(msg.Message), "masalah") {
+			// Handle the complaint process here
+			complaintContent := strings.TrimPrefix(strings.ToLower(msg.Message), "keluhan")
+			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
+			complaintContent = strings.TrimSpace(complaintContent)
+
+			// Forward the complaint to the admin's phone number
+			adminPhoneNumber := "admin_phone_number"  // Replace with the actual admin's phone number
+			forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: %s", complaintContent, msg.Phone_number)
+			forwardDT := &wa.TextMessage{
+				To:       adminPhoneNumber,
 				IsGroup:  false,
-				Messages: reply,
+				Messages: forwardMessage,
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else if strings.HasPrefix(msg.Message, "report") || strings.HasPrefix(msg.Message, "Report") {
-			// Handle the reporting process here
-			reportContent := strings.TrimPrefix(msg.Message, "report")
-			reportContent = strings.TrimPrefix(reportContent, "Report")
-			reportContent = strings.TrimSpace(reportContent)
-	
-			// Send the report to the Discord webhook
-			discordWebhookURL := "https://discord.com/api/webhooks/1170045069018026025/df2hxPLEoQOblNvZK3b4RxwzNp7JVtZ66nqSiRLrGBbFpxeBtbhLyH3isvEtpLOoTbKj" // Replace with your Discord webhook URL
-			reportNotification := fmt.Sprintf("🚨 New Report Received!\n📝 Report Content: %s\n📱 Reporter's Number: %s", reportContent, msg.Phone_number)
-	
-			// Send report notification to Discord
-			err := sendToDiscordWebhook(discordWebhookURL, reportNotification)
-			if err != nil {
-				// Handle the error (e.g., log it)
-			}
-	
-			// Send acknowledgment to the reporter
-			reply := "Terima kasih! Laporan Anda telah diterima dan akan segera ditindaklanjuti."
-	
-			// Send acknowledgment to reporter via WhatsApp
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
+
+			// Send acknowledgment to the user
+			reply := "Keluhan Anda telah kami terima. Silahkan tunggu respon dari admin Rumah Kopi dalam waktu 1 x 24 jam."
 			ackDT := &wa.TextMessage{
 				To:       msg.Phone_number,
 				IsGroup:  false,
 				Messages: reply,
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response](os.Getenv("TOKEN"), os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else {
-			resp.Response = "Secret Salah"
+			resp.Response = "Command not recognized"
 		}
+	}
 }
-}
+
 func sendToDiscordWebhook(webhookURL, message string) error {
 	// Create a new HTTP POST request to the Discord webhook
 	req, err := http.NewRequest("POST", webhookURL, strings.NewReader(fmt.Sprintf(`{"content": "%s"}`, message)))
