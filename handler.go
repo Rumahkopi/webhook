@@ -106,6 +106,15 @@ func deleteComplaintByContent(complaintContent string) error {
 	return err
 }
 
+// Function to delete all complaints
+func deleteAllComplaints() error {
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Delete all documents in the collection
+	_, err := collection.DeleteMany(context.Background(), bson.M{})
+	return err
+}
+
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
 	var resp atmessage.Response
@@ -205,7 +214,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				complaintContentToDelete = strings.TrimSpace(complaintContentToDelete)
 
 				// Delete the specified complaint
-				err := deleteComplaintByContent("keluhan" + complaintContentToDelete)
+				err := deleteComplaintByContent("keluhan" + " " + complaintContentToDelete)
 				if err != nil {
 					fmt.Println("Error deleting complaint from MongoDB:", err)
 					// Handle the error (e.g., log it)
@@ -213,6 +222,38 @@ func Post(w http.ResponseWriter, r *http.Request) {
 
 				// Send acknowledgment to the admin
 				adminReply := fmt.Sprintf("Keluhan dengan konten '%s' berhasil dihapus.", complaintContentToDelete)
+				adminDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: adminReply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				resp.Response = "You are not authorized to access this command."
+			}
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallkeluhan") {
+			// Handle the "deleteallkeluhan" command for admin
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
+
+			// Check if the sender is an admin
+			isAdmin := false
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				if msg.Phone_number == adminPhoneNumber {
+					isAdmin = true
+					break
+				}
+			}
+
+			if isAdmin {
+				// Delete all complaints
+				err := deleteAllComplaints()
+				if err != nil {
+					fmt.Println("Error deleting all complaints from MongoDB:", err)
+					// Handle the error (e.g., log it)
+				}
+
+				// Send acknowledgment to the admin
+				adminReply := "Semua keluhan berhasil dihapus."
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
 					IsGroup:  false,
