@@ -21,7 +21,7 @@ import (
 const (
 	mongoConnectionString = "mongodb+srv://Syahid25:4yyoi59f6p8GKGHT@syahid.jirstmg.mongodb.net/"
 	mongoDBName           = "proyek3"
-	mongoCollectionName   = "transaksi"
+	mongoCollectionName   = "keluhan"
 )
 
 // MongoDB client
@@ -69,6 +69,32 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 	// Insert document into MongoDB
 	_, err := collection.InsertOne(context.Background(), complaint)
 	return err
+}
+
+// Function to retrieve all complaint data from MongoDB
+func getAllComplaints() ([]string, error) {
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Find all documents in the collection
+	cursor, err := collection.Find(context.Background(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	var complaints []string
+	for cursor.Next(context.Background()) {
+		var complaint bson.M
+		err := cursor.Decode(&complaint)
+		if err != nil {
+			return nil, err
+		}
+		complaintStr := fmt.Sprintf("Timestamp: %v\nUser Phone: %s\nComplaint Content: %s\n\n",
+			complaint["timestamp"], complaint["user_phone"], complaint["content"])
+		complaints = append(complaints, complaintStr)
+	}
+
+	return complaints, nil
 }
 
 func Post(w http.ResponseWriter, r *http.Request) {
@@ -119,6 +145,38 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "listkeluhan") {
+			// Handle the "listkeluhan" command for admin
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
+
+			// Check if the sender is an admin
+			isAdmin := false
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				if msg.Phone_number == adminPhoneNumber {
+					isAdmin = true
+					break
+				}
+			}
+
+			if isAdmin {
+				// Retrieve all complaints from MongoDB
+				complaints, err := getAllComplaints()
+				if err != nil {
+					fmt.Println("Error retrieving complaints from MongoDB:", err)
+					// Handle the error (e.g., log it)
+				}
+
+				// Prepare and send the list of complaints to the admin
+				adminReply := "Daftar Keluhan:\n\n" + strings.Join(complaints, "\n")
+				adminDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: adminReply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				resp.Response = "You are not authorized to access this command."
+			}
 		} else {
 			resp.Response = "Command not recognized"
 		}
