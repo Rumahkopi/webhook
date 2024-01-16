@@ -59,16 +59,22 @@ func closeMongoClient() {
 func insertComplaintData(complaintContent string, userPhone string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
+	// Set the timezone to WIB (Waktu Indonesia Barat)
+	wib, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return err
+	}
+
 	// Prepare complaint document
 	complaint := bson.M{
 		"content":       complaintContent,
 		"user_phone":    userPhone,
-		"timestamp":     time.Now(),
-		"formattedTime": time.Now().Format("Monday, 02-Jan-06 15:04:05 MST"),
+		"timestamp":     time.Now().In(wib),
+		"formattedTime": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
 	// Insert document into MongoDB
-	_, err := collection.InsertOne(context.Background(), complaint)
+	_, err = collection.InsertOne(context.Background(), complaint)
 	return err
 }
 
