@@ -59,25 +59,17 @@ func closeMongoClient() {
 func insertComplaintData(complaintContent string, userPhone string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
-	// Set the timezone to WIB (Waktu Indonesia Barat)
-	wib, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		return err
-	}
-
 	// Prepare complaint document
 	complaint := bson.M{
-		"content":       "keluhan" + complaintContent,
-		"user_phone":    userPhone,
-		"timestamp":     time.Now().In(wib),
-		"formattedTime": time.Now().In(wib).Format("Monday, 02-January-2006 15:04:05 MST"),
+		"content":   "keluhan" + complaintContent, // Prefix "keluhan" to the content
+		"user_phone": userPhone,
+		"timestamp":  time.Now(),
 	}
 
 	// Insert document into MongoDB
-	_, err = collection.InsertOne(context.Background(), complaint)
+	_, err := collection.InsertOne(context.Background(), complaint)
 	return err
 }
-
 
 // Function to retrieve all complaint data from MongoDB
 func getAllComplaints() ([]string, error) {
@@ -97,12 +89,21 @@ func getAllComplaints() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		complaintStr := fmt.Sprintf("Timestamp: %s\nUser Phone: %s\nComplaint Content: %s\n\n",
-			complaint["formattedTime"], complaint["user_phone"], complaint["content"])
+		complaintStr := fmt.Sprintf("Timestamp: %v\nUser Phone: %s\nComplaint Content: %s\n\n",
+			complaint["timestamp"], complaint["user_phone"], complaint["content"])
 		complaints = append(complaints, complaintStr)
 	}
 
 	return complaints, nil
+}
+
+// Function to delete a complaint by content
+func deleteComplaintByContent(complaintContent string) error {
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Delete the complaint with the specified content
+	_, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
+	return err
 }
 
 func Post(w http.ResponseWriter, r *http.Request) {
@@ -185,9 +186,44 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deletekeluhan") {
+			// Handle the "deletekeluhan [complaintContent]" command for admin
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
+
+			// Check if the sender is an admin
+			isAdmin := false
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				if msg.Phone_number == adminPhoneNumber {
+					isAdmin = true
+					break
+				}
+			}
+
+			if isAdmin {
+				// Extract the complaint content from the command
+				complaintContentToDelete := strings.TrimPrefix(strings.ToLower(msg.Message), "deletekeluhan ")
+				complaintContentToDelete = strings.TrimSpace(complaintContentToDelete)
+
+				// Delete the specified complaint
+				err := deleteComplaintByContent("keluhan" + complaintContentToDelete)
+				if err != nil {
+					fmt.Println("Error deleting complaint from MongoDB:", err)
+					// Handle the error (e.g., log it)
+				}
+
+				// Send acknowledgment to the admin
+				adminReply := fmt.Sprintf("Keluhan dengan konten '%s' berhasil dihapus.", complaintContentToDelete)
+				adminDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: adminReply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				resp.Response = "You are not authorized to access this command."
+			}
 		} else {
 			resp.Response = "Command not recognized"
 		}
 	}
 }
-			
