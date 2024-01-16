@@ -61,7 +61,7 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 
 	// Prepare complaint document
 	complaint := bson.M{
-		"content":   "keluhan" + complaintContent, // Prefix "keluhan" to the content
+		"content":   "keluhan" + " " + complaintContent, // Prefix "keluhan" to the content
 		"user_phone": userPhone,
 		"timestamp":  time.Now(),
 	}
