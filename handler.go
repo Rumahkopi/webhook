@@ -82,15 +82,12 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			// Handle the image message with the text "Sudah Bayar"
 			// Forward the image to the admin phone numbers
 			for _, adminPhoneNumber := range adminPhoneNumbers {
-				forwardMedia := &wa.MediaMessage{
-					To:         adminPhoneNumber,
-					IsGroup:    false,
-					MediaURL:   msg.MediaURL,
-					Caption:    "Gambar Bukti Pembayaran",
-					MediaType:  "image",
-					ButtonText: "View Image",
-				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardMedia, "https://api.wa.my.id/api/send/message/media")
+				// Construct the URL for forwarding
+				forwardURL := fmt.Sprintf("https://api.wa.my.id/api/send/media?token=%s&to=%s&isgroup=false&mediaurl=%s&caption=%s&mediatype=image&buttontext=View Image",
+					os.Getenv("TOKEN"), adminPhoneNumber, msg.MediaURL, "Gambar Bukti Pembayaran")
+
+				// Send HTTP POST request to forward the image
+				_, _ = http.Post(forwardURL, "application/json", nil)
 			}
 
 			// Send acknowledgment to the user
