@@ -62,8 +62,9 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 	// Prepare complaint document
 	complaint := bson.M{
 		"content":   "keluhan" + " " + complaintContent, // Prefix "keluhan" to the content
-		"user_phone": userPhone,
-		"timestamp":  time.Now(),
+		"user_phone":    userPhone,
+		"timestamp":     time.Now().In(wib),
+		"formattedTime": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
 	// Insert document into MongoDB
