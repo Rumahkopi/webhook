@@ -79,20 +79,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 		} else {
-			// Check if the message contains an image
-			if msg.Type == "image" {
-				// Forward the image to all admin phone numbers
-				for _, adminPhoneNumber := range adminPhoneNumbers {
-					forwardImage := &wa.ImageMessage{
-						To:   adminPhoneNumber,
-						Type: "image",
-						URL:  msg.URL,
-					}
-					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardImage, "https://api.wa.my.id/api/send/message/image")
-				}
-			} else {
-				resp.Response = "Command not recognized"
-			}
+			resp.Response = "Command not recognized"
 		}
 	}
 }
