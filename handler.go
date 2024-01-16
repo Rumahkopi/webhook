@@ -67,7 +67,7 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 
 	// Prepare complaint document
 	complaint := bson.M{
-		"content":       complaintContent,
+		"content":       "keluhan" + complaintContent,
 		"user_phone":    userPhone,
 		"timestamp":     time.Now().In(wib),
 		"formattedTime": time.Now().In(wib).Format("Monday, 02-January-2006 15:04:05 MST"),
@@ -77,6 +77,7 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 	_, err = collection.InsertOne(context.Background(), complaint)
 	return err
 }
+
 
 // Function to retrieve all complaint data from MongoDB
 func getAllComplaints() ([]string, error) {
