@@ -80,24 +80,30 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 		} else if msg.Type == "image" && strings.ToLower(msg.Message) == "sudah bayar" {
 			// Handle the image message with the text "Sudah Bayar"
-			// Forward the image to the admin phone numbers
-			for _, adminPhoneNumber := range adminPhoneNumbers {
-				// Construct the URL for forwarding
-				forwardURL := fmt.Sprintf("https://api.wa.my.id/api/send/media?token=%s&to=%s&isgroup=false&mediaurl=%s&caption=%s&mediatype=image&buttontext=View Image",
-					os.Getenv("TOKEN"), adminPhoneNumber, msg.MediaURL, "Gambar Bukti Pembayaran")
+			// Replace "MediaURL" with the actual field name in your IteungMessage model
+			if msg.MediaURL != "" {
+				// Forward the image to the admin phone numbers
+				for _, adminPhoneNumber := range adminPhoneNumbers {
+					// Construct the URL for forwarding
+					forwardURL := fmt.Sprintf("https://api.wa.my.id/api/send/media?token=%s&to=%s&isgroup=false&mediaurl=%s&caption=%s&mediatype=image&buttontext=View Image",
+						os.Getenv("TOKEN"), adminPhoneNumber, msg.MediaURL, "Gambar Bukti Pembayaran")
 
-				// Send HTTP POST request to forward the image
-				_, _ = http.Post(forwardURL, "application/json", nil)
-			}
+					// Send HTTP POST request to forward the image
+					_, _ = http.Post(forwardURL, "application/json", nil)
+				}
 
-			// Send acknowledgment to the user
-			reply := "Terimakasih!! Bukti pembayaran Anda telah kami terima. Silahkan tunggu konfirmasi dari admin Rumah Kopi."
-			ackDT := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: reply,
+				// Send acknowledgment to the user
+				reply := "Terimakasih!! Bukti pembayaran Anda telah kami terima. Silahkan tunggu konfirmasi dari admin Rumah Kopi."
+				ackDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: reply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				// Handle the case where the media URL is empty
+				resp.Response = "Invalid image message. Please resend the image with the text 'Sudah Bayar'."
 			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else {
 			resp.Response = "Command not recognized"
 		}
