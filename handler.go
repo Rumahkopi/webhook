@@ -1,16 +1,75 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/aiteung/atapi"
 	"github.com/aiteung/atmessage"
 	"github.com/aiteung/module/model"
 	"github.com/whatsauth/wa"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
+
+// MongoDB configuration
+const (
+	mongoConnectionString = "mongodb+srv://Syahid25:4yyoi59f6p8GKGHT@syahid.jirstmg.mongodb.net/"
+	mongoDBName           = "proyek3"
+	mongoCollectionName   = "transaksi"
+)
+
+// MongoDB client
+var mongoClient *mongo.Client
+
+// Initialize MongoDB client
+func init() {
+	client, err := mongo.NewClient(options.Client().ApplyURI(mongoConnectionString))
+	if err != nil {
+		panic(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = client.Connect(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	mongoClient = client
+}
+
+// Close MongoDB client
+func closeMongoClient() {
+	if mongoClient != nil {
+		err := mongoClient.Disconnect(context.Background())
+		if err != nil {
+			fmt.Println("Error disconnecting MongoDB:", err)
+		}
+	}
+}
+
+// Function to insert complaint data into MongoDB
+func insertComplaintData(complaintContent string, userPhone string) error {
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Prepare complaint document
+	complaint := bson.M{
+		"content":   complaintContent,
+		"user_phone": userPhone,
+		"timestamp":  time.Now(),
+	}
+
+	// Insert document into MongoDB
+	_, err := collection.InsertOne(context.Background(), complaint)
+	return err
+}
 
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
@@ -33,10 +92,15 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
 			complaintContent = strings.TrimSpace(complaintContent)
 
-			// List of admin phone numbers
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
+			// Insert complaint data into MongoDB
+			err := insertComplaintData(complaintContent, msg.Phone_number)
+			if err != nil {
+				fmt.Println("Error inserting complaint data into MongoDB:", err)
+				// Handle the error (e.g., log it)
+			}
 
 			// Forward the complaint to all admin phone numbers
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: %s", complaintContent, msg.Phone_number)
 				forwardDT := &wa.TextMessage{
@@ -55,55 +119,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-		} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli ") {
-			// Handle the "beli [text client]" command
-			clientText := strings.TrimPrefix(strings.ToLower(msg.Message), "beli ")
-			reply := fmt.Sprintf("Anda akan membayar %s melalui metode pembayaran berikut:\n1. BCA\n2. Dana\n3. Gopay", clientText)
-
-			// Send payment information to the user
-			dt := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: reply,
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else if strings.ToLower(msg.Message) == "fixbayar" {
-			// Respond to the "fixbayar" command
-			reply := "Silahkan kirim hasil screenshotan pembayaran beserta teks 'Sudah Bayar'."
-
-			// Send instructions to the user
-			dt := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: reply,
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-		} else if msg.Type == "image" && strings.ToLower(msg.Message) == "sudah bayar" {
-			// Handle the image message with the text "Sudah Bayar"
-			// Replace "MediaURL" with the actual field name in your IteungMessage model
-			if msg.MediaURL != "" {
-				// Forward the image to the admin phone numbers
-				for _, adminPhoneNumber := range adminPhoneNumbers {
-					// Construct the URL for forwarding
-					forwardURL := fmt.Sprintf("https://api.wa.my.id/api/send/media?token=%s&to=%s&isgroup=false&mediaurl=%s&caption=%s&mediatype=image&buttontext=View Image",
-						os.Getenv("TOKEN"), adminPhoneNumber, msg.MediaURL, "Gambar Bukti Pembayaran")
-
-					// Send HTTP POST request to forward the image
-					_, _ = http.Post(forwardURL, "application/json", nil)
-				}
-
-				// Send acknowledgment to the user
-				reply := "Terimakasih!! Bukti pembayaran Anda telah kami terima. Silahkan tunggu konfirmasi dari admin Rumah Kopi."
-				ackDT := &wa.TextMessage{
-					To:       msg.Phone_number,
-					IsGroup:  false,
-					Messages: reply,
-				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-			} else {
-				// Handle the case where the media URL is empty
-				resp.Response = "Invalid image message. Please resend the image with the text 'Sudah Bayar'."
-			}
 		} else {
 			resp.Response = "Command not recognized"
 		}
