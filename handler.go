@@ -61,9 +61,10 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 
 	// Prepare complaint document
 	complaint := bson.M{
-		"content":   complaintContent,
-		"user_phone": userPhone,
-		"timestamp":  time.Now(),
+		"content":       complaintContent,
+		"user_phone":    userPhone,
+		"timestamp":     time.Now(),
+		"formattedTime": time.Now().Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
 	// Insert document into MongoDB
@@ -89,8 +90,8 @@ func getAllComplaints() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		complaintStr := fmt.Sprintf("Timestamp: %v\nUser Phone: %s\nComplaint Content: %s\n\n",
-			complaint["timestamp"], complaint["user_phone"], complaint["content"])
+		complaintStr := fmt.Sprintf("Timestamp: %s\nUser Phone: %s\nComplaint Content: %s\n\n",
+			complaint["formattedTime"], complaint["user_phone"], complaint["content"])
 		complaints = append(complaints, complaintStr)
 	}
 
@@ -182,3 +183,4 @@ func Post(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+			
