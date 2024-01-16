@@ -78,6 +78,29 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+		} else if msg.Type == "image" && strings.ToLower(msg.Message) == "sudah bayar" {
+			// Handle the image message with the text "Sudah Bayar"
+			// Forward the image to the admin phone numbers
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				forwardMedia := &wa.MediaMessage{
+					To:         adminPhoneNumber,
+					IsGroup:    false,
+					MediaURL:   msg.MediaURL,
+					Caption:    "Gambar Bukti Pembayaran",
+					MediaType:  "image",
+					ButtonText: "View Image",
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardMedia, "https://api.wa.my.id/api/send/message/media")
+			}
+
+			// Send acknowledgment to the user
+			reply := "Terimakasih!! Bukti pembayaran Anda telah kami terima. Silahkan tunggu konfirmasi dari admin Rumah Kopi."
+			ackDT := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else {
 			resp.Response = "Command not recognized"
 		}
