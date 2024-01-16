@@ -70,7 +70,7 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 		"content":       complaintContent,
 		"user_phone":    userPhone,
 		"timestamp":     time.Now().In(wib),
-		"formattedTime": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+		"formattedTime": time.Now().In(wib).Format("Monday, 02-January-2006 15:04:05 MST"),
 	}
 
 	// Insert document into MongoDB
