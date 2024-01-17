@@ -151,7 +151,7 @@ func getAllTransactions() ([]string, error) {
 			return nil, err
 		}
 		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nUser Phone: %s\nPayment Proof: %s\n\n",
-			transaction["transaksi_number"], transaction["timestamp"], transaction["user_phone"], transaction["payment_proof"])
+			transaction["transaksi_number"], transaction["formatted_time"], transaction["user_phone"], transaction["payment_proof"])
 		transactions = append(transactions, transactionStr)
 	}
 
