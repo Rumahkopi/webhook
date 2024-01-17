@@ -255,47 +255,54 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
-		} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
-			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
-			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
-			paymentProof = strings.TrimSpace(paymentProof)
-
-			// Ensure that the client provides a valid image link
-			if strings.HasPrefix(paymentProof, "http") {
-				// Extract the image link from the message
-				buktitf := paymentProof
-
-				adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
-				for _, adminPhoneNumber := range adminPhoneNumbers {
-					// Forward image link to admin
-					forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
-					forwardDT := &wa.TextMessage{
-						To:       adminPhoneNumber,
-						IsGroup:  false,
-						Messages: forwardMessage,
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
+				paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
+				paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
+				paymentProof = strings.TrimSpace(paymentProof)
+	
+				// Ensure that the client provides a valid image link
+				if strings.HasPrefix(paymentProof, "http") {
+					// Extract the image link from the message
+					buktitf := paymentProof
+	
+					adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+					for _, adminPhoneNumber := range adminPhoneNumbers {
+						// Forward image link to admin
+						forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+						forwardDT := &wa.TextMessage{
+							To:       adminPhoneNumber,
+							IsGroup:  false,
+							Messages: forwardMessage,
+						}
+						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 					}
-					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
+	
+					// Insert transaction data into MongoDB
+					err := insertTransactionData(paymentProof, msg.Phone_number, buktitf)
+					if err != nil {
+						fmt.Println("Error inserting transaction data into MongoDB:", err)
+					}
+	
+					reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+				} else {
+					// Respond if the provided input is not a valid URL
+					resp.Messages = []string{"Format error. Please provide a valid image link URL starting with 'http' or 'https'."}
+					reply := "salah cuyyy"
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 				}
-
-				// Insert transaction data into MongoDB
-				err := insertTransactionData(paymentProof, msg.Phone_number, buktitf)
-				if err != nil {
-					fmt.Println("Error inserting transaction data into MongoDB:", err)
-				}
-
-				reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
-				ackDT := &wa.TextMessage{
-					To:       msg.Phone_number,
-					IsGroup:  false,
-					Messages: []string{reply},
-				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 			} else {
-				// Respond if the provided input is not a valid URL
-				resp.Messages = []string{"Format error. Please provide a valid image link URL starting with 'http' or 'https'."}
+				resp.Response = "Command not recognized"
 			}
-		} else {
-			resp.Response = "Command not recognized"
 		}
 	}
-}
