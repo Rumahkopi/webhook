@@ -256,18 +256,19 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
-		} else 	if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
 			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
 			paymentProof = strings.TrimSpace(paymentProof)
 	
 			// Check if the message contains media (image)
-			mediaURL, err := atapi.GetMediaURL(os.Getenv("TOKEN"), msg.ID)
-			if err == nil {
-				paymentProof += "\nMedia URL: " + mediaURL
+			mediaURL := ""
+			if msg.Type == "image" {
+				// Handle media attachment
+				mediaURL = fmt.Sprintf("Media Type: %s, Media URL: %s", msg.Type, msg.MediaURL)
 			}
 	
-			err = insertTransactionData(paymentProof, msg.Phone_number)
+			err := insertTransactionData(paymentProof, msg.Phone_number)
 			if err != nil {
 				fmt.Println("Error inserting transaction data into MongoDB:", err)
 			}
@@ -276,7 +277,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
 				if mediaURL != "" {
-					forwardMessage += "\nMedia URL: " + mediaURL
+					forwardMessage += "\n" + mediaURL
 				}
 				forwardDT := &wa.TextMessage{
 					To:       adminPhoneNumber,
