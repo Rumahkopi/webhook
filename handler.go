@@ -27,7 +27,10 @@ const (
 // MongoDB client
 var mongoClient *mongo.Client
 
-// Initialize MongoDB client
+// Location for WIB (Western Indonesian Time)
+var wib *time.Location
+
+// Initialize MongoDB client and WIB location
 func init() {
 	client, err := mongo.NewClient(options.Client().ApplyURI(mongoConnectionString))
 	if err != nil {
@@ -43,6 +46,12 @@ func init() {
 	}
 
 	mongoClient = client
+
+	// Set the WIB location
+	wib, err = time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Close MongoDB client
@@ -61,10 +70,10 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 
 	// Prepare complaint document
 	complaint := bson.M{
-		"content":   "keluhan" + " " + complaintContent, // Prefix "keluhan" to the content
-		"user_phone":    userPhone,
-		"timestamp":     time.Now().In(wib),
-		"formattedTime": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+		"content":        "keluhan" + " " + complaintContent, // Prefix "keluhan" to the content
+		"user_phone":     userPhone,
+		"timestamp":      time.Now().In(wib),
+		"formatted_time": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
 	// Insert document into MongoDB
