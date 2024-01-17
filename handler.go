@@ -262,10 +262,10 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			paymentProof = strings.TrimSpace(paymentProof)
 	
 			// Check if the message contains media information
-			mediaInfo := ""
-			if msg.Media != nil {
-				// Adjust this part based on the actual structure of the media information in your message payload
-				mediaInfo = fmt.Sprintf("Media Type: %s, Media URL: %s", msg.Media.Type, msg.Media.URL)
+			var mediaURL string
+			if msg.SendImageMessage != nil {
+				// Assuming that SendImageMessage returns the media URL
+				mediaURL, _ = msg.SendImageMessage(plaintext, "Image Caption", adminPhoneNumber, whatsapp)
 			}
 	
 			err := insertTransactionData(paymentProof, msg.Phone_number)
@@ -276,8 +276,8 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
-				if mediaInfo != "" {
-					forwardMessage += "\n" + mediaInfo
+				if mediaURL != "" {
+					forwardMessage += "\nMedia URL: " + mediaURL
 				}
 				forwardDT := &wa.TextMessage{
 					To:       adminPhoneNumber,
