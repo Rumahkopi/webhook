@@ -110,6 +110,7 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 func getAllComplaints() ([]string, error) {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
+	// Find all documents in the collection
 	cursor, err := collection.Find(context.Background(), bson.M{})
 	if err != nil {
 		return nil, err
@@ -123,8 +124,8 @@ func getAllComplaints() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		complaintStr := fmt.Sprintf("Timestamp: %v\nUser Phone: %s\nComplaint Content: %s\n\n",
-			complaint["timestamp"], complaint["user_phone"], complaint["content"])
+		complaintStr := fmt.Sprintf("Timestamp: %s\nUser Phone: %s\nComplaint Content: %s\n\n",
+			complaint["formattedTime"], complaint["user_phone"], complaint["content"])
 		complaints = append(complaints, complaintStr)
 	}
 
