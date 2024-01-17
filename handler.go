@@ -102,24 +102,15 @@ func getAllComplaints() ([]string, error) {
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
-	// Get the current count of transactions to determine the transaction number
-	count, err := collection.CountDocuments(context.Background(), bson.M{})
-	if err != nil {
-		return err
-	}
-
-	transaksiNumber := count + 1
-
 	transaction := bson.M{
-		"transaksi_number": transaksiNumber,
-		"payment_proof":    paymentProof,
-		"user_phone":       userPhone,
-		"buktitf":          buktitf,
-		"timestamp":        time.Now().In(wib),
-		"formatted_time":   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+		"payment_proof":   paymentProof,
+		"user_phone":      userPhone,
+		"buktitf":         buktitf,
+		"timestamp":       time.Now().In(wib),
+		"formatted_time":  time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
-	_, err = collection.InsertOne(context.Background(), transaction)
+	_, err := collection.InsertOne(context.Background(), transaction)
 	return err
 }
 
@@ -162,6 +153,21 @@ func deleteComplaintByContent(complaintContent string) error {
 // Function to delete all complaints
 func deleteAllComplaints() error {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Delete all documents in the collection
+	_, err := collection.DeleteMany(context.Background(), bson.M{})
+	return err
+}
+func deleteTransactionByNumber(transaksiNumber int) error {
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+	// Delete the transaction with the specified Transaksi Number
+	_, err := collection.DeleteOne(context.Background(), bson.M{"transaksi_number": transaksiNumber})
+	return err
+}
+// Function to delete all transactions
+func deleteAllTransactions() error {
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
 	// Delete all documents in the collection
 	_, err := collection.DeleteMany(context.Background(), bson.M{})
@@ -316,6 +322,87 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			} else {
 				resp.Response = "You are not authorized to access this command."
+			}
+		}else if strings.HasPrefix(strings.ToLower(msg.Message), "deletebayar") {
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+			isAdmin := false
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				if msg.Phone_number == adminPhoneNumber {
+					isAdmin = true
+					break
+				}
+			}
+	
+			if isAdmin {
+				transaksiNumberToDeleteStr := strings.TrimPrefix(strings.ToLower(msg.Message), "deletebayar")
+				transaksiNumberToDeleteStr = strings.TrimSpace(transaksiNumberToDeleteStr)
+	
+				// Convert the Transaksi Number to integer
+				transaksiNumberToDelete, err := strconv.Atoi(transaksiNumberToDeleteStr)
+				if err != nil {
+					// Handle invalid Transaksi Number format
+					reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number."
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					return
+				}
+	
+				err = deleteTransactionByNumber(transaksiNumberToDelete)
+				if err != nil {
+					fmt.Println("Error deleting transaction from MongoDB:", err)
+					reply := "Error deleting transaction. Please try again."
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					return
+				}
+	
+				adminReply := fmt.Sprintf("Transaction with Transaksi Number '%d' successfully deleted.", transaksiNumberToDelete)
+				adminDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: adminReply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
+			}
+		}else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallbayar") {
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+			isAdmin := false
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				if msg.Phone_number == adminPhoneNumber {
+					isAdmin = true
+					break
+				}
+			}
+	
+			if isAdmin {
+				err := deleteAllTransactions()
+				if err != nil {
+					fmt.Println("Error deleting all transactions from MongoDB:", err)
+					reply := "Error deleting all transactions. Please try again."
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					return
+				}
+	
+				adminReply := "All transactions successfully deleted."
+				adminDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: adminReply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			}
 			} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
 				paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
