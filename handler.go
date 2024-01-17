@@ -130,8 +130,47 @@ func deleteAllComplaints() error {
 	_, err := collection.DeleteMany(context.Background(), bson.M{})
 	return err
 }
+func sendImageMessage(filedata string, caption string, toJID string, whatsapp *wa.Client) error {
+	respupload, err := whatsapp.Upload(context.Background(), []byte(filedata), whatsmeow.MediaImage)
+	if err != nil {
+		msg := fmt.Sprintf("SendImageMessage to wa server: %s", err)
+		fmt.Println(msg)
+		SendMessage(msg, toJID, whatsapp)
+		return err
+	}
 
+	imgMsg := &waProto.ImageMessage{
+		Caption:       proto.String(caption),
+		Url:           proto.String(respupload.URL),
+		DirectPath:    proto.String(respupload.DirectPath),
+		MediaKey:      respupload.MediaKey,
+		Mimetype:      proto.String(http.DetectContentType([]byte(filedata))),
+		FileEncSha256: respupload.FileEncSHA256,
+		FileSha256:    respupload.FileSHA256,
+		FileLength:    proto.Uint64(uint64(len(filedata))),
+	}
 
+	imgMessage := &waProto.Message{
+		ImageMessage: imgMsg,
+	}
+
+	_, err = whatsapp.SendMessage(context.Background(), toJID, imgMessage)
+	return err
+}
+
+// Function to send chat message
+func sendChatMessage(messages string, toJID string, whatsapp *wa.Client) error {
+	textMsg := &waProto.TextMessage{
+		Body: proto.String(messages),
+	}
+
+	msg := &waProto.Message{
+		TextMessage: textMsg,
+	}
+
+	_, err := whatsapp.SendMessage(context.Background(), toJID, msg)
+	return err
+}
 
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
@@ -257,36 +296,24 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
-			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
-			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
-			paymentProof = strings.TrimSpace(paymentProof)
-	
-			// Check if the message contains media information
-			var mediaURL string
-			if msg.SendImageMessage != nil {
-				// Assuming that SendImageMessage returns the media URL
-				mediaURL, _ = msg.SendImageMessage(plaintext, "Image Caption", adminPhoneNumber, whatsapp)
-			}
-	
-			err := insertTransactionData(paymentProof, msg.Phone_number)
-			if err != nil {
-				fmt.Println("Error inserting transaction data into MongoDB:", err)
-			}
-	
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
-			for _, adminPhoneNumber := range adminPhoneNumbers {
-				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
-				if mediaURL != "" {
-					forwardMessage += "\nMedia URL: " + mediaURL
+			filedata := msg.Filedata  // Assuming Filedata contains the image data
+			caption := "Caption for the image"  // Set your desired caption
+			toJIDs := []string{"6283174845017", "6285312924192"}  // Set admin phone numbers
+			for _, toJID := range toJIDs {
+				// Send both chat and image to admin
+				err := sendChatMessage(msg.Messages, toJID, yourWhatsAppClient)
+				if err != nil {
+					fmt.Println("Error sending chat message:", err)
+					// Handle the error (e.g., log it)
 				}
-				forwardDT := &wa.TextMessage{
-					To:       adminPhoneNumber,
-					IsGroup:  false,
-					Messages: forwardMessage,
+		
+				err = sendImageMessage(filedata, caption, toJID, yourWhatsAppClient)
+				if err != nil {
+					fmt.Println("Error sending image message:", err)
+					// Handle the error (e.g., log it)
 				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 			}
-	
+		
 			reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
 			ackDT := &wa.TextMessage{
 				To:       msg.Phone_number,
