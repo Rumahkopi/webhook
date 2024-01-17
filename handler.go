@@ -102,17 +102,53 @@ func getAllComplaints() ([]string, error) {
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
-	transaction := bson.M{
-		"payment_proof":   paymentProof,
-		"user_phone":      userPhone,
-		"buktitf":         buktitf,
-		"timestamp":       time.Now().In(wib),
-		"formatted_time":  time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+	// Get the current count of transactions to determine the transaction number
+	count, err := collection.CountDocuments(context.Background(), bson.M{})
+	if err != nil {
+		return err
 	}
 
-	_, err := collection.InsertOne(context.Background(), transaction)
+	transaksiNumber := count + 1
+
+	transaction := bson.M{
+		"transaksi_number": transaksiNumber,
+		"payment_proof":    paymentProof,
+		"user_phone":       userPhone,
+		"buktitf":          buktitf,
+		"timestamp":        time.Now().In(wib),
+		"formatted_time":   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+	}
+
+	_, err = collection.InsertOne(context.Background(), transaction)
 	return err
 }
+
+// ...
+
+func getAllTransactions() ([]string, error) {
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+	cursor, err := collection.Find(context.Background(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	var transactions []string
+	for cursor.Next(context.Background()) {
+		var transaction bson.M
+		err := cursor.Decode(&transaction)
+		if err != nil {
+			return nil, err
+		}
+		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nUser Phone: %s\nPayment Proof: %s\n\n",
+			transaction["transaksi_number"], transaction["timestamp"], transaction["user_phone"], transaction["payment_proof"])
+		transactions = append(transactions, transactionStr)
+	}
+
+	return transactions, nil
+}
+
 
 // Function to delete a complaint by content
 func deleteComplaintByContent(complaintContent string) error {
@@ -255,6 +291,32 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
+		} else 	if strings.HasPrefix(strings.ToLower(msg.Message), "listbayar") {
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+			isAdmin := false
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				if msg.Phone_number == adminPhoneNumber {
+					isAdmin = true
+					break
+				}
+			}
+	
+			if isAdmin {
+				transactions, err := getAllTransactions()
+				if err != nil {
+					fmt.Println("Error retrieving transactions from MongoDB:", err)
+				}
+	
+				adminReply := "Daftar Transaksi:\n\n" + strings.Join(transactions, "\n")
+				adminDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: adminReply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				resp.Response = "You are not authorized to access this command."
+			}
 			} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
 				paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 				paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
@@ -292,8 +354,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 				} else {
 					// Respond if the provided input is not a valid URL
-					// resp.Messages = []string{"Format error. Please provide a valid image link URL starting with 'http' or 'https'."}
-					reply := "salah cuyyy"
+					reply := "salah cuyyy caranya itu: \n bayar [link bukti fotonya]"
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
