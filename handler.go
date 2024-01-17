@@ -113,6 +113,16 @@ func insertTransactionData(paymentProof string, userPhone string) error {
 	return err
 }
 
+// Function to delete a complaint by content
+func deleteComplaintByContent(complaintContent string) error {
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Delete the complaint with the specified content
+	_, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
+	return err
+}
+
+
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
 	var resp atmessage.Response
