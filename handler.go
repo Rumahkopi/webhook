@@ -86,26 +86,30 @@ func insertTransactionData(paymentProof string, userPhone string, buktitf string
 	return err
 }
 func insertComplaintData(complaintContent string, userPhone string) error {
-	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+    collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
-	// Set the timezone to WIB (Waktu Indonesia Barat)
-	wib, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		return err
-	}
+    // Get the current count of complaints to determine the complaint number
+    count, err := collection.CountDocuments(context.Background(), bson.M{})
+    if err != nil {
+        return err
+    }
 
-	// Prepare complaint document
-	complaint := bson.M{
-		"content":       complaintContent,
-		"user_phone":    userPhone,
-		"timestamp":     time.Now().In(wib),
-		"formattedTime": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
-	}
+    complaintNumber := count + 1
 
-	// Insert document into MongoDB
-	_, err = collection.InsertOne(context.Background(), complaint)
-	return err
+    // Prepare complaint document
+    complaint := bson.M{
+        "complaint_number": complaintNumber,
+        "content":          complaintContent,
+        "user_phone":       userPhone,
+        "timestamp":        time.Now().In(wib),
+        "formattedTime":    time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+    }
+
+    // Insert document into MongoDB
+    _, err = collection.InsertOne(context.Background(), complaint)
+    return err
 }
+
 
 func getAllComplaints() ([]string, error) {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
@@ -159,13 +163,21 @@ func getAllTransactions() ([]string, error) {
 }
 
 
-// Function to delete a complaint by content
 func deleteComplaintByContent(complaintContent string) error {
-	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+    collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
-	// Delete the complaint with the specified content
-	_, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
-	return err
+    // Delete the complaint with the specified content
+    _, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
+    return err
+}
+
+// Function to delete a complaint by number
+func deleteComplaintByNumber(complaintNumber int) error {
+    collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+    // Delete the complaint with the specified number
+    _, err := collection.DeleteOne(context.Background(), bson.M{"complaint_number": complaintNumber})
+    return err
 }
 
 // Function to delete all complaints
@@ -269,26 +281,32 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-
+		
 			if isAdmin {
-				complaintContentToDelete := strings.TrimPrefix(strings.ToLower(msg.Message), "deletekeluhan ")
-				complaintContentToDelete = strings.TrimSpace(complaintContentToDelete)
-
-				err := deleteComplaintByContent("keluhan" + " " + complaintContentToDelete)
-				if err != nil {
-					fmt.Println("Error deleting complaint from MongoDB:", err)
+				// Check if the user provided a complaint number to delete
+				parts := strings.Fields(msg.Message)
+				if len(parts) == 2 {
+					complaintNumberToDelete, err := strconv.Atoi(parts[1])
+					if err != nil {
+						resp.Response = "Invalid complaint number. Please provide a valid complaint number to delete."
+						return
+					}
+		
+					err = deleteComplaintByNumber(complaintNumberToDelete)
+					if err != nil {
+						fmt.Println("Error deleting complaint from MongoDB:", err)
+					}
+		
+					adminReply := fmt.Sprintf("Keluhan dengan nomor '%d' berhasil dihapus.", complaintNumberToDelete)
+					adminDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: adminReply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
+				} else {
+					resp.Response = "Please provide a valid complaint number to delete."
 				}
-
-				adminReply := fmt.Sprintf("Keluhan dengan konten '%s' berhasil dihapus.", complaintContentToDelete)
-				adminDT := &wa.TextMessage{
-					To:       msg.Phone_number,
-					IsGroup:  false,
-					Messages: adminReply,
-				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
-			} else {
-				resp.Response = "You are not authorized to access this command."
-			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallkeluhan") {
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
