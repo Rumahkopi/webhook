@@ -19,9 +19,9 @@ import (
 
 // MongoDB configuration
 const (
-	mongoConnectionString = "mongodb+srv://Syahid25:4yyoi59f6p8GKGHT@syahid.jirstmg.mongodb.net/"
-	mongoDBName           = "proyek3"
-	mongoCollectionName   = "keluhan"
+	mongoConnectionString   = "mongodb+srv://Syahid25:4yyoi59f6p8GKGHT@syahid.jirstmg.mongodb.net/"
+	mongoDBName             = "proyek3"
+	mongoCollectionName     = "keluhan"
 	transaksiCollectionName = "transaksi"
 )
 
@@ -65,10 +65,10 @@ func insertComplaintData(complaintContent string, userPhone string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
 	complaint := bson.M{
-		"content":   "keluhan" + " " + complaintContent,
-		"user_phone":    userPhone,
-		"timestamp":     time.Now().In(wib),
-		"formatted_time": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+		"content":         "keluhan" + " " + complaintContent,
+		"user_phone":      userPhone,
+		"timestamp":       time.Now().In(wib),
+		"formatted_time":  time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
 	_, err := collection.InsertOne(context.Background(), complaint)
@@ -99,16 +99,15 @@ func getAllComplaints() ([]string, error) {
 	return complaints, nil
 }
 
-func insertTransactionData(paymentProof, userPhone, filename, filedata string) error {
+func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
 	transaction := bson.M{
-		"payment_proof":  paymentProof,
-		"user_phone":     userPhone,
-		"filename":       filename,
-		"filedata":       filedata,
-		"timestamp":      time.Now().In(wib),
-		"formatted_time": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+		"payment_proof":   paymentProof,
+		"user_phone":      userPhone,
+		"buktitf":         buktitf,
+		"timestamp":       time.Now().In(wib),
+		"formatted_time":  time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
 	_, err := collection.InsertOne(context.Background(), transaction)
@@ -123,6 +122,7 @@ func deleteComplaintByContent(complaintContent string) error {
 	_, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
 	return err
 }
+
 // Function to delete all complaints
 func deleteAllComplaints() error {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
@@ -131,8 +131,6 @@ func deleteAllComplaints() error {
 	_, err := collection.DeleteMany(context.Background(), bson.M{})
 	return err
 }
-
-
 
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
@@ -261,47 +259,40 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
 			paymentProof = strings.TrimSpace(paymentProof)
-	
-			// Extract filename and filedata from IteungMessage
-			filename := msg.Filename
-			filedata := msg.Filedata
-	
-			err := insertTransactionData(paymentProof, msg.Phone_number, filename, filedata)
-			if err != nil {
-				fmt.Println("Error inserting transaction data into MongoDB:", err)
-			}
-	
-			// Check if image data is present
-			if filename != "" && filedata != "" {
+
+			// Ensure that the client provides a valid image link
+			if strings.HasPrefix(paymentProof, "http") {
+				// Extract the image link from the message
+				buktitf := paymentProof
+
 				adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 				for _, adminPhoneNumber := range adminPhoneNumbers {
-					// Forward text message to admin
-					textMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
-					textForwardMessage := &wa.TextMessage{
+					// Forward image link to admin
+					forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+					forwardDT := &wa.TextMessage{
 						To:       adminPhoneNumber,
 						IsGroup:  false,
-						Messages: textMessage,
+						Messages: forwardMessage,
 					}
-					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), textForwardMessage, "https://api.wa.my.id/api/send/message/text")
-	
-					// Forward image message to admin
-					imageForwardMessage := &wa.ImageMessage{
-						To:       adminPhoneNumber,
-						IsGroup:  false,
-						Filename: filename,
-						Filedata: filedata,
-					}
-					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), imageForwardMessage, "https://api.wa.my.id/api/send/message/image")
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 				}
+
+				// Insert transaction data into MongoDB
+				err := insertTransactionData(paymentProof, msg.Phone_number, buktitf)
+				if err != nil {
+					fmt.Println("Error inserting transaction data into MongoDB:", err)
+				}
+
+				reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
+				ackDT := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: reply,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+			} else {
+				resp.Response = "Invalid image link. Please provide a valid URL starting with 'http' or 'https'."
 			}
-	
-			reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
-			ackDT := &wa.TextMessage{
-				To:       msg.Phone_number,
-				IsGroup:  false,
-				Messages: reply,
-			}
-			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else {
 			resp.Response = "Command not recognized"
 		}
