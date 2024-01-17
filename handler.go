@@ -129,7 +129,7 @@ func getAllComplaints() ([]string, error) {
             return nil, err
         }
 
-        complaintStr := fmt.Sprintf("Complaint Number: %v\nTimestamp: %s\nUser Phone: %s\nComplaint Content: %s\n\n",
+        complaintStr := fmt.Sprintf("Complaint Number: %v\nTimestamp: %s\nUser Phone: https://wa.me/%s\nComplaint Content: %s\n\n",
             complaint["complaint_number"], complaint["formattedTime"], complaint["user_phone"], complaint["content"])
         complaints = append(complaints, complaintStr)
     }
@@ -156,7 +156,7 @@ func getAllTransactions() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nUser Phone: %s\nPayment Proof: %s\n\n",
+		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nUser Phone: https://wa.me/%s\nPayment Proof: %s\n\n",
 			transaction["transaksi_number"], transaction["formatted_time"], transaction["user_phone"], transaction["payment_proof"])
 		transactions = append(transactions, transactionStr)
 	}
@@ -222,7 +222,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli") {
 				// Echo back the user's message
-				reply := "kamu sudah yakin dengan :" + msg.Message + "\nkamu bisa bayar melalui:\n Bank BCA: \n No Dana:"
+				reply := "kamu sudah yakin dengan :\n" + msg.Message + "\nkamu bisa bayar melalui:\n Bank BCA:321321312 \n No Dana:088883211232\n No Gopay:088883211232 \n Jika Kamu sudah membayarkan kamu bisa lakukan :\n bayar [link bukti screenshot transfer]"
 			
 				dt := &wa.TextMessage{
 					To:       msg.Phone_number,
