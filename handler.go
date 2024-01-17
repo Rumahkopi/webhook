@@ -309,6 +309,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				} else {
 					resp.Response = "Please provide a valid complaint number to delete."
 				}
+			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallkeluhan") {
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
