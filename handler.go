@@ -129,7 +129,7 @@ func getAllComplaints() ([]string, error) {
             return nil, err
         }
 
-        complaintStr := fmt.Sprintf("Complaint Number: %v\nTimestamp: %s\nUser Phone: https://wa.me/%s\nComplaint Content: %s\n\n",
+        complaintStr := fmt.Sprintf("Complaint Number: %v\nTimestamp: %s\nUser Phone: %s\nComplaint Content: %s\n\n",
             complaint["complaint_number"], complaint["formattedTime"], complaint["user_phone"], complaint["content"])
         complaints = append(complaints, complaintStr)
     }
@@ -156,7 +156,7 @@ func getAllTransactions() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nUser Phone: https://wa.me/%s\nPayment Proof: %s\n\n",
+		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nUser Phone: %s\nPayment Proof: %s\n\n",
 			transaction["transaksi_number"], transaction["formatted_time"], transaction["user_phone"], transaction["payment_proof"])
 		transactions = append(transactions, transactionStr)
 	}
@@ -242,7 +242,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			for _, adminPhoneNumber := range adminPhoneNumbers {
-				forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: %s", complaintContent, msg.Phone_number)
+				forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: https://wa.me/%s", complaintContent, msg.Phone_number)
 				forwardDT := &wa.TextMessage{
 					To:       adminPhoneNumber,
 					IsGroup:  false,
@@ -466,7 +466,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 					for _, adminPhoneNumber := range adminPhoneNumbers {
 						// Forward image link to admin
-						forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+						forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: https://wa.me/%s", paymentProof, msg.Phone_number)
 						forwardDT := &wa.TextMessage{
 							To:       adminPhoneNumber,
 							IsGroup:  false,
