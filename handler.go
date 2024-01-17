@@ -287,11 +287,12 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				ackDT := &wa.TextMessage{
 					To:       msg.Phone_number,
 					IsGroup:  false,
-					Messages: reply,
+					Messages: []string{reply},
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 			} else {
-				resp.Response = "Invalid image link. Please provide a valid URL starting with 'http' or 'https'."
+				// Respond if the provided input is not a valid URL
+				resp.Messages = []string{"Format error. Please provide a valid image link URL starting with 'http' or 'https'."}
 			}
 		} else {
 			resp.Response = "Command not recognized"
