@@ -63,43 +63,49 @@ func closeMongoClient() {
 }
 
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
-    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
-    // Get the current count of transactions to determine the transaction number
-    count, err := collection.CountDocuments(context.Background(), bson.M{})
-    if err != nil {
-        return err
-    }
+	// Get the current count of transactions to determine the transaction number
+	count, err := collection.CountDocuments(context.Background(), bson.M{})
+	if err != nil {
+		return err
+	}
 
-    transaksiNumber := count + 1
+	transaksiNumber := count + 1
 
-    transaction := bson.M{
-        "transaksi_number": transaksiNumber,
-        "payment_proof":    paymentProof,
-        "user_phone":       userPhone,
-        "buktitf":          buktitf,
-        "timestamp":        time.Now().In(wib).Unix(), // Store timestamp in seconds
-        "formatted_time":   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
-    }
+	transaction := bson.M{
+		"transaksi_number": transaksiNumber,
+		"payment_proof":    paymentProof,
+		"user_phone":       userPhone,
+		"buktitf":          buktitf,
+		"timestamp":        time.Now().In(wib),
+		"formatted_time":   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+	}
 
-    _, err = collection.InsertOne(context.Background(), transaction)
-    return err
+	_, err = collection.InsertOne(context.Background(), transaction)
+	return err
 }
-
 func insertComplaintData(complaintContent string, userPhone string) error {
-    collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
-    complaint := bson.M{
-        "content":         "keluhan" + " " + complaintContent,
-        "user_phone":      userPhone,
-        "timestamp":       time.Now().In(wib).Unix(), // Store timestamp in seconds
-        "formatted_time":  time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
-    }
+	// Set the timezone to WIB (Waktu Indonesia Barat)
+	wib, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return err
+	}
 
-    _, err := collection.InsertOne(context.Background(), complaint)
-    return err
+	// Prepare complaint document
+	complaint := bson.M{
+		"content":       complaintContent,
+		"user_phone":    userPhone,
+		"timestamp":     time.Now().In(wib),
+		"formattedTime": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+	}
+
+	// Insert document into MongoDB
+	_, err = collection.InsertOne(context.Background(), complaint)
+	return err
 }
-
 
 func getAllComplaints() ([]string, error) {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
