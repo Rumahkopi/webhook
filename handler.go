@@ -230,7 +230,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					Messages: reply,
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "keluhan") || strings.HasPrefix(strings.ToLower(msg.Message), "masalah") {
 			complaintContent := strings.TrimPrefix(strings.ToLower(msg.Message), "keluhan")
 			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
