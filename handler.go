@@ -271,15 +271,28 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				fmt.Println("Error inserting transaction data into MongoDB:", err)
 			}
 	
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
-			for _, adminPhoneNumber := range adminPhoneNumbers {
-				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
-				forwardDT := &wa.TextMessage{
-					To:       adminPhoneNumber,
-					IsGroup:  false,
-					Messages: forwardMessage,
+			// Check if image data is present
+			if filename != "" && filedata != "" {
+				adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+				for _, adminPhoneNumber := range adminPhoneNumbers {
+					// Forward text message to admin
+					textMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+					textForwardMessage := &wa.TextMessage{
+						To:       adminPhoneNumber,
+						IsGroup:  false,
+						Messages: textMessage,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), textForwardMessage, "https://api.wa.my.id/api/send/message/text")
+	
+					// Forward image message to admin
+					imageForwardMessage := &wa.ImageMessage{
+						To:       adminPhoneNumber,
+						IsGroup:  false,
+						Filename: filename,
+						Filedata: filedata,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), imageForwardMessage, "https://api.wa.my.id/api/send/message/image")
 				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 			}
 	
 			reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
