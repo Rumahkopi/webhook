@@ -99,6 +99,7 @@ func getAllComplaints() ([]string, error) {
 	return complaints, nil
 }
 
+// Function to insert transaction data into MongoDB
 func insertTransactionData(paymentProof string, userPhone string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
@@ -255,19 +256,28 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
-		} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
+		} else 	if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
 			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
 			paymentProof = strings.TrimSpace(paymentProof)
-
-			err := insertTransactionData(paymentProof, msg.Phone_number)
+	
+			// Check if the message contains media (image)
+			mediaURL, err := atapi.GetMediaURL(os.Getenv("TOKEN"), msg.ID)
+			if err == nil {
+				paymentProof += "\nMedia URL: " + mediaURL
+			}
+	
+			err = insertTransactionData(paymentProof, msg.Phone_number)
 			if err != nil {
 				fmt.Println("Error inserting transaction data into MongoDB:", err)
 			}
-
+	
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+				if mediaURL != "" {
+					forwardMessage += "\nMedia URL: " + mediaURL
+				}
 				forwardDT := &wa.TextMessage{
 					To:       adminPhoneNumber,
 					IsGroup:  false,
@@ -275,7 +285,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 			}
-
+	
 			reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
 			ackDT := &wa.TextMessage{
 				To:       msg.Phone_number,
