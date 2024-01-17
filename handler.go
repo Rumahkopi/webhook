@@ -15,15 +15,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	//tes
-	"github.com/aiteung/musik"
-	_ "github.com/mattn/go-sqlite3"
-	"go.mau.fi/whatsmeow"
-	waProto "go.mau.fi/whatsmeow/binary/proto"
-	"go.mau.fi/whatsmeow/store/sqlstore"
-	"go.mau.fi/whatsmeow/types"
-	waLog "go.mau.fi/whatsmeow/util/log"
-	"google.golang.org/protobuf/proto"
 )
 
 // MongoDB configuration
@@ -108,14 +99,15 @@ func getAllComplaints() ([]string, error) {
 	return complaints, nil
 }
 
-// Function to insert transaction data into MongoDB
-func insertTransactionData(paymentProof string, userPhone string) error {
+func insertTransactionData(paymentProof, userPhone, filename, filedata string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
 	transaction := bson.M{
-		"payment_proof": paymentProof,
-		"user_phone":    userPhone,
-		"timestamp":     time.Now().In(wib),
+		"payment_proof":  paymentProof,
+		"user_phone":     userPhone,
+		"filename":       filename,
+		"filedata":       filedata,
+		"timestamp":      time.Now().In(wib),
 		"formatted_time": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
@@ -139,47 +131,8 @@ func deleteAllComplaints() error {
 	_, err := collection.DeleteMany(context.Background(), bson.M{})
 	return err
 }
-func sendImageMessage(filedata string, caption string, toJID string, whatsapp *wa.Client) error {
-	respupload, err := whatsapp.Upload(context.Background(), []byte(filedata), whatsmeow.MediaImage)
-	if err != nil {
-		msg := fmt.Sprintf("SendImageMessage to wa server: %s", err)
-		fmt.Println(msg)
-		SendMessage(msg, toJID, whatsapp)
-		return err
-	}
 
-	imgMsg := &waProto.ImageMessage{
-		Caption:       proto.String(caption),
-		Url:           proto.String(respupload.URL),
-		DirectPath:    proto.String(respupload.DirectPath),
-		MediaKey:      respupload.MediaKey,
-		Mimetype:      proto.String(http.DetectContentType([]byte(filedata))),
-		FileEncSha256: respupload.FileEncSHA256,
-		FileSha256:    respupload.FileSHA256,
-		FileLength:    proto.Uint64(uint64(len(filedata))),
-	}
 
-	imgMessage := &waProto.Message{
-		ImageMessage: imgMsg,
-	}
-
-	_, err = whatsapp.SendMessage(context.Background(), toJID, imgMessage)
-	return err
-}
-
-// Function to send chat message
-func sendChatMessage(messages string, toJID string, whatsapp *wa.Client) error {
-	textMsg := &waProto.TextMessage{
-		Body: proto.String(messages),
-	}
-
-	msg := &waProto.Message{
-		TextMessage: textMsg,
-	}
-
-	_, err := whatsapp.SendMessage(context.Background(), toJID, msg)
-	return err
-}
 
 func Post(w http.ResponseWriter, r *http.Request) {
 	var msg model.IteungMessage
@@ -305,24 +258,30 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
-			filedata := msg.Filedata  // Assuming Filedata contains the image data
-			caption := "Caption for the image"  // Set your desired caption
-			toJIDs := []string{"6283174845017", "6285312924192"}  // Set admin phone numbers
-			for _, toJID := range toJIDs {
-				// Send both chat and image to admin
-				err := sendChatMessage(msg.Messages, toJID, yourWhatsAppClient)
-				if err != nil {
-					fmt.Println("Error sending chat message:", err)
-					// Handle the error (e.g., log it)
-				}
-		
-				err = sendImageMessage(filedata, caption, toJID, yourWhatsAppClient)
-				if err != nil {
-					fmt.Println("Error sending image message:", err)
-					// Handle the error (e.g., log it)
-				}
+			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
+			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
+			paymentProof = strings.TrimSpace(paymentProof)
+	
+			// Extract filename and filedata from IteungMessage
+			filename := msg.Filename
+			filedata := msg.Filedata
+	
+			err := insertTransactionData(paymentProof, msg.Phone_number, filename, filedata)
+			if err != nil {
+				fmt.Println("Error inserting transaction data into MongoDB:", err)
 			}
-		
+	
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+				forwardDT := &wa.TextMessage{
+					To:       adminPhoneNumber,
+					IsGroup:  false,
+					Messages: forwardMessage,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
+			}
+	
 			reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
 			ackDT := &wa.TextMessage{
 				To:       msg.Phone_number,
