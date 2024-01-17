@@ -22,16 +22,20 @@ const (
 	mongoConnectionString = "mongodb+srv://Syahid25:4yyoi59f6p8GKGHT@syahid.jirstmg.mongodb.net/"
 	mongoDBName           = "proyek3"
 	mongoCollectionName   = "keluhan"
+	transaksiCollectionName = "transaksi"
 )
 
 // MongoDB client
 var mongoClient *mongo.Client
 
-// Location for WIB (Western Indonesian Time)
+// Timezone for Indonesia (WIB - Western Indonesian Time)
 var wib *time.Location
 
-// Initialize MongoDB client and WIB location
 func init() {
+	// Set the timezone for WIB
+	wib, _ = time.LoadLocation("Asia/Jakarta")
+
+	// Initialize MongoDB client
 	client, err := mongo.NewClient(options.Client().ApplyURI(mongoConnectionString))
 	if err != nil {
 		panic(err)
@@ -46,15 +50,8 @@ func init() {
 	}
 
 	mongoClient = client
-
-	// Set the WIB location
-	wib, err = time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		panic(err)
-	}
 }
 
-// Close MongoDB client
 func closeMongoClient() {
 	if mongoClient != nil {
 		err := mongoClient.Disconnect(context.Background())
@@ -64,28 +61,23 @@ func closeMongoClient() {
 	}
 }
 
-// Function to insert complaint data into MongoDB
 func insertComplaintData(complaintContent string, userPhone string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
-	// Prepare complaint document
 	complaint := bson.M{
-		"content":        "keluhan" + " " + complaintContent, // Prefix "keluhan" to the content
-		"user_phone":     userPhone,
-		"timestamp":      time.Now().In(wib),
+		"content":   "keluhan" + " " + complaintContent,
+		"user_phone":    userPhone,
+		"timestamp":     time.Now().In(wib),
 		"formatted_time": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
 	}
 
-	// Insert document into MongoDB
 	_, err := collection.InsertOne(context.Background(), complaint)
 	return err
 }
 
-// Function to retrieve all complaint data from MongoDB
 func getAllComplaints() ([]string, error) {
 	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
-	// Find all documents in the collection
 	cursor, err := collection.Find(context.Background(), bson.M{})
 	if err != nil {
 		return nil, err
@@ -107,21 +99,17 @@ func getAllComplaints() ([]string, error) {
 	return complaints, nil
 }
 
-// Function to delete a complaint by content
-func deleteComplaintByContent(complaintContent string) error {
-	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+func insertTransactionData(paymentProof string, userPhone string) error {
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
-	// Delete the complaint with the specified content
-	_, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
-	return err
-}
+	transaction := bson.M{
+		"payment_proof": paymentProof,
+		"user_phone":    userPhone,
+		"timestamp":     time.Now().In(wib),
+		"formatted_time": time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+	}
 
-// Function to delete all complaints
-func deleteAllComplaints() error {
-	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
-
-	// Delete all documents in the collection
-	_, err := collection.DeleteMany(context.Background(), bson.M{})
+	_, err := collection.InsertOne(context.Background(), transaction)
 	return err
 }
 
@@ -132,7 +120,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 
 	if r.Header.Get("Secret") == os.Getenv("SECRET") {
 		if strings.ToLower(msg.Message) == "ada masalah" {
-			// Respond to "ada masalah" command
 			reply := "Silahkan tuliskan keluhan dan masalah Anda."
 			dt := &wa.TextMessage{
 				To:       msg.Phone_number,
@@ -141,20 +128,16 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "keluhan") || strings.HasPrefix(strings.ToLower(msg.Message), "masalah") {
-			// Handle the complaint process here
 			complaintContent := strings.TrimPrefix(strings.ToLower(msg.Message), "keluhan")
 			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
 			complaintContent = strings.TrimSpace(complaintContent)
 
-			// Insert complaint data into MongoDB
 			err := insertComplaintData(complaintContent, msg.Phone_number)
 			if err != nil {
 				fmt.Println("Error inserting complaint data into MongoDB:", err)
-				// Handle the error (e.g., log it)
 			}
 
-			// Forward the complaint to all admin phone numbers
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: %s", complaintContent, msg.Phone_number)
 				forwardDT := &wa.TextMessage{
@@ -165,7 +148,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 			}
 
-			// Send acknowledgment to the user
 			reply := "Terimakasih!!. Keluhan Anda telah kami terima. Silahkan tunggu respon dari admin Rumah Kopi dalam waktu 1 x 24 jam."
 			ackDT := &wa.TextMessage{
 				To:       msg.Phone_number,
@@ -174,10 +156,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "listkeluhan") {
-			// Handle the "listkeluhan" command for admin
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
-
-			// Check if the sender is an admin
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -187,14 +166,11 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if isAdmin {
-				// Retrieve all complaints from MongoDB
 				complaints, err := getAllComplaints()
 				if err != nil {
 					fmt.Println("Error retrieving complaints from MongoDB:", err)
-					// Handle the error (e.g., log it)
 				}
 
-				// Prepare and send the list of complaints to the admin
 				adminReply := "Daftar Keluhan:\n\n" + strings.Join(complaints, "\n")
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -206,10 +182,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deletekeluhan") {
-			// Handle the "deletekeluhan [complaintContent]" command for admin
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
-
-			// Check if the sender is an admin
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -219,18 +192,14 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if isAdmin {
-				// Extract the complaint content from the command
 				complaintContentToDelete := strings.TrimPrefix(strings.ToLower(msg.Message), "deletekeluhan ")
 				complaintContentToDelete = strings.TrimSpace(complaintContentToDelete)
 
-				// Delete the specified complaint
 				err := deleteComplaintByContent("keluhan" + " " + complaintContentToDelete)
 				if err != nil {
 					fmt.Println("Error deleting complaint from MongoDB:", err)
-					// Handle the error (e.g., log it)
 				}
 
-				// Send acknowledgment to the admin
 				adminReply := fmt.Sprintf("Keluhan dengan konten '%s' berhasil dihapus.", complaintContentToDelete)
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -242,10 +211,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallkeluhan") {
-			// Handle the "deleteallkeluhan" command for admin
-			adminPhoneNumbers := []string{"6283174845017", "6285312924192"} // Add more admin numbers as needed
-
-			// Check if the sender is an admin
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -255,14 +221,11 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if isAdmin {
-				// Delete all complaints
 				err := deleteAllComplaints()
 				if err != nil {
 					fmt.Println("Error deleting all complaints from MongoDB:", err)
-					// Handle the error (e.g., log it)
 				}
 
-				// Send acknowledgment to the admin
 				adminReply := "Semua keluhan berhasil dihapus."
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -273,6 +236,34 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
+			paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
+			paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
+			paymentProof = strings.TrimSpace(paymentProof)
+
+			err := insertTransactionData(paymentProof, msg.Phone_number)
+			if err != nil {
+				fmt.Println("Error inserting transaction data into MongoDB:", err)
+			}
+
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+			for _, adminPhoneNumber := range adminPhoneNumbers {
+				forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: %s", paymentProof, msg.Phone_number)
+				forwardDT := &wa.TextMessage{
+					To:       adminPhoneNumber,
+					IsGroup:  false,
+					Messages: forwardMessage,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
+			}
+
+			reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
+			ackDT := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else {
 			resp.Response = "Command not recognized"
 		}
