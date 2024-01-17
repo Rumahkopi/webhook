@@ -121,6 +121,15 @@ func deleteComplaintByContent(complaintContent string) error {
 	_, err := collection.DeleteOne(context.Background(), bson.M{"content": complaintContent})
 	return err
 }
+// Function to delete all complaints
+func deleteAllComplaints() error {
+	collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
+
+	// Delete all documents in the collection
+	_, err := collection.DeleteMany(context.Background(), bson.M{})
+	return err
+}
+
 
 
 func Post(w http.ResponseWriter, r *http.Request) {
