@@ -220,6 +220,30 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli") {
+				// Menampilkan nomor rekening dan tombol "Bayar"
+				reply := "Anda dapat melakukan pembayaran melalui transfer ke nomor rekening berikut:\n\nBank: Bank ABC\nNomor Rekening: 1234567890\nAtas Nama: Syahid\n\nUntuk melanjutkan pembayaran, ketik 'bayar [link bukti fotonya]'."
+				
+				// Menambahkan tombol "Bayar"
+				buttons := []wa.QuickButton{
+					{
+						ButtonID:   "bayar_button",
+						ButtonType: wa.TextButton,
+						Text:       "Bayar Sekarang",
+						Action: wa.QuickButtonAction{
+							Type: wa.ReplyAction,
+							Body: "bayar",
+						},
+					},
+				}
+				
+				dt := &wa.TextMessage{
+					To:       msg.Phone_number,
+					IsGroup:  false,
+					Messages: reply,
+					Buttons:  buttons,
+				}
+				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "keluhan") || strings.HasPrefix(strings.ToLower(msg.Message), "masalah") {
 			complaintContent := strings.TrimPrefix(strings.ToLower(msg.Message), "keluhan")
 			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
