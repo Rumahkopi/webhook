@@ -260,16 +260,15 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli") {
-				// Echo back the user's message
-				reply := "kamu sudah yakin dengan :\n" + msg.Message + "\nkamu bisa bayar melalui:\nBank BCA: 321321312 \nNo Dana: 088883211232\nNo Gopay: 088883211232 \nJika Kamu sudah membayarkan kamu bisa lakukan :\n bayar [link bukti screenshot transfer]\n\nJika Kamu Kesulitan bisa chat kontak support berikut ini:\nhttps://wa.me/6285312924192\nhttps://wa.me/6283174845017"
-			
-				dt := &wa.TextMessage{
-					To:       msg.Phone_number,
-					IsGroup:  false,
-					Messages: reply,
-				}
-				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli") {
+			// Echo back the user's message
+			reply := "kamu sudah yakin dengan :\n" + msg.Message + "\nkamu bisa bayar melalui:\nBank BCA: 321321312 \nNo Dana: 088883211232\nNo Gopay: 088883211232 \nJika Kamu sudah membayarkan kamu bisa lakukan :\n bayar [link bukti screenshot transfer]\n\nJika Kamu Kesulitan bisa chat kontak support berikut ini:\nhttps://wa.me/6285312924192\nhttps://wa.me/6283174845017"
+			dt := &wa.TextMessage{
+				To:       msg.Phone_number,
+				IsGroup:  false,
+				Messages: reply,
+			}
+			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "keluhan") || strings.HasPrefix(strings.ToLower(msg.Message), "masalah") {
 			complaintContent := strings.TrimPrefix(strings.ToLower(msg.Message), "keluhan")
 			complaintContent = strings.TrimPrefix(complaintContent, "masalah")
@@ -333,7 +332,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-		
+
 			if isAdmin {
 				// Check if the user provided a complaint number to delete
 				parts := strings.Fields(msg.Message)
@@ -343,12 +342,12 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						resp.Response = "Invalid complaint number. Please provide a valid complaint number to delete."
 						return
 					}
-		
+
 					err = deleteComplaintByNumber(complaintNumberToDelete)
 					if err != nil {
 						fmt.Println("Error deleting complaint from MongoDB:", err)
 					}
-		
+
 					adminReply := fmt.Sprintf("Keluhan dengan nomor '%d' berhasil dihapus.", complaintNumberToDelete)
 					adminDT := &wa.TextMessage{
 						To:       msg.Phone_number,
@@ -386,7 +385,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
-		} else 	if strings.HasPrefix(strings.ToLower(msg.Message), "listbayar") {
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "listbayar") {
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
@@ -395,13 +394,13 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-	
+
 			if isAdmin {
 				transactions, err := getAllTransactions()
 				if err != nil {
 					fmt.Println("Error retrieving transactions from MongoDB:", err)
 				}
-	
+
 				adminReply := "Daftar Transaksi:\n\n" + strings.Join(transactions, "\n")
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -412,7 +411,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Response = "You are not authorized to access this command."
 			}
-		}else if strings.HasPrefix(strings.ToLower(msg.Message), "deletebayar") {
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deletebayar") {
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
@@ -421,11 +420,11 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-	
+
 			if isAdmin {
 				transaksiNumberToDeleteStr := strings.TrimPrefix(strings.ToLower(msg.Message), "deletebayar")
 				transaksiNumberToDeleteStr = strings.TrimSpace(transaksiNumberToDeleteStr)
-	
+
 				// Convert the Transaksi Number to integer
 				transaksiNumberToDelete, err := strconv.Atoi(transaksiNumberToDeleteStr)
 				if err != nil {
@@ -439,8 +438,8 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 					return
 				}
-	
-				err = deleteTransactionByNumber(transaksiNumberToDelete)
+
+				err = deleteTransactionByNumber(int64(transaksiNumberToDelete))
 				if err != nil {
 					fmt.Println("Error deleting transaction from MongoDB:", err)
 					reply := "Error deleting transaction. Please try again."
@@ -452,7 +451,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 					return
 				}
-	
+
 				adminReply := fmt.Sprintf("Transaction with Transaksi Number '%d' successfully deleted.", transaksiNumberToDelete)
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -461,7 +460,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			}
-		}else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallbayar") {
+		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallbayar") {
 			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
@@ -470,7 +469,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-	
+
 			if isAdmin {
 				err := deleteAllTransactions()
 				if err != nil {
@@ -484,7 +483,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 					return
 				}
-	
+
 				adminReply := "All transactions successfully deleted."
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -493,20 +492,20 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			}
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "cekstatus") {
+			if strings.HasPrefix(strings.ToLower(msg.Message), "cekstatus") {
 				// Handle check status command
 				parts := strings.Fields(msg.Message)
 				if len(parts) == 1 {
 					// Get user's phone number
 					userPhone := msg.Phone_number
-	
+
 					// Retrieve user's transactions from MongoDB
 					transactions, err := getTransactionsByUser(userPhone)
 					if err != nil {
 						fmt.Println("Error retrieving user's transactions from MongoDB:", err)
 						return
 					}
-	
+
 					// Construct message with transaction details
 					var message string
 					if len(transactions) == 0 {
@@ -518,7 +517,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 								transaction.TransaksiNumber, transaction.FormattedTime, transaction.Status)
 						}
 					}
-	
+
 					// Send message to user
 					dt := &wa.TextMessage{
 						To:       userPhone,
@@ -540,16 +539,16 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 				paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
 				paymentProof = strings.TrimSpace(paymentProof)
-	
+
 				// Ensure that the client provides a valid image link
 				if strings.HasPrefix(paymentProof, "http") {
 					buktitf := paymentProof
-	
+
 					err := insertTransactionData(paymentProof, msg.Phone_number, buktitf)
 					if err != nil {
 						fmt.Println("Error inserting transaction data into MongoDB:", err)
 					}
-	
+
 					adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 					for _, adminPhoneNumber := range adminPhoneNumbers {
 						forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: https://wa.me/%s", paymentProof, msg.Phone_number)
@@ -560,7 +559,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						}
 						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
 					}
-	
+
 					reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
@@ -592,21 +591,21 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 						return
 					}
-	
+
 					isApproved := strings.ToLower(parts[0]) == "setuju"
-					err = approvePayment(transaksiNumber, isApproved)
+					err = approvePayment(int64(transaksiNumber), isApproved)
 					if err != nil {
 						fmt.Println("Error updating payment status in MongoDB:", err)
 						return
 					}
-	
+
 					// Inform user about the payment status
-					transaction, err := getTransactionByNumber(transaksiNumber)
+					transaction, err := getTransactionByNumber(int64(transaksiNumber))
 					if err != nil {
 						fmt.Println("Error retrieving transaction data from MongoDB:", err)
 						return
 					}
-	
+
 					err = informUserAboutPaymentStatus(transaction.TransaksiNumber, transaction.UserPhone, transaction.Status)
 					if err != nil {
 						fmt.Println("Error sending payment status message to user:", err)
@@ -623,9 +622,10 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	
+
 		json.NewEncoder(w).Encode(resp)
 	}
+}
 	
 func getTransactionByNumber(transaksiNumber int) (Transaction, error) {
     var transaction Transaction
