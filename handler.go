@@ -493,6 +493,49 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			}
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "cekstatus") {
+				// Handle check status command
+				parts := strings.Fields(msg.Message)
+				if len(parts) == 1 {
+					// Get user's phone number
+					userPhone := msg.Phone_number
+	
+					// Retrieve user's transactions from MongoDB
+					transactions, err := getTransactionsByUser(userPhone)
+					if err != nil {
+						fmt.Println("Error retrieving user's transactions from MongoDB:", err)
+						return
+					}
+	
+					// Construct message with transaction details
+					var message string
+					if len(transactions) == 0 {
+						message = "Anda belum memiliki transaksi."
+					} else {
+						message = "Status Transaksi Anda:\n\n"
+						for _, transaction := range transactions {
+							message += fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nStatus: %s\n\n",
+								transaction.TransaksiNumber, transaction.FormattedTime, transaction.Status)
+						}
+					}
+	
+					// Send message to user
+					dt := &wa.TextMessage{
+						To:       userPhone,
+						IsGroup:  false,
+						Messages: message,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+				} else {
+					reply := "Format pesan tidak valid. Gunakan format: cekstatus"
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					return
+				}
 			} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
 				paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 				paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
@@ -534,51 +577,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 				}
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "cekstatus") {
-					// Handle check status command
-					parts := strings.Fields(msg.Message)
-					if len(parts) == 1 {
-						// Get user's phone number
-						userPhone := msg.Phone_number
-		
-						// Retrieve user's transactions from MongoDB
-						transactions, err := getTransactionsByUser(userPhone)
-						if err != nil {
-							fmt.Println("Error retrieving user's transactions from MongoDB:", err)
-							return
-						}
-		
-						// Construct message with transaction details
-						var message string
-						if len(transactions) == 0 {
-							message = "Anda belum memiliki transaksi."
-						} else {
-							message = "Status Transaksi Anda:\n\n"
-							for _, transaction := range transactions {
-								message += fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nStatus: %s\n\n",
-									transaction.TransaksiNumber, transaction.FormattedTime, transaction.Status)
-							}
-						}
-		
-						// Send message to user
-						dt := &wa.TextMessage{
-							To:       userPhone,
-							IsGroup:  false,
-							Messages: message,
-						}
-						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-					} else {
-						reply := "Format pesan tidak valid. Gunakan format: cekstatus"
-						ackDT := &wa.TextMessage{
-							To:       msg.Phone_number,
-							IsGroup:  false,
-							Messages: reply,
-						}
-						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-						return
-					}
-				} 
-			else if strings.HasPrefix(strings.ToLower(msg.Message), "setuju") || strings.HasPrefix(strings.ToLower(msg.Message), "tolak") {
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "setuju") || strings.HasPrefix(strings.ToLower(msg.Message), "tolak") {
 				// Handle admin approval or rejection of payment
 				parts := strings.Fields(msg.Message)
 				if len(parts) >= 3 {
@@ -640,27 +639,4 @@ func getTransactionByNumber(transaksiNumber int) (Transaction, error) {
     }
 
     return transaction, nil
-}
-func getTransactionsByUser(userPhone string) ([]Transaction, error) {
-    var transactions []Transaction
-
-    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
-
-    filter := bson.M{"user_phone": userPhone}
-    cursor, err := collection.Find(context.Background(), filter)
-    if err != nil {
-        return nil, err
-    }
-    defer cursor.Close(context.Background())
-
-    for cursor.Next(context.Background()) {
-        var transaction Transaction
-        err := cursor.Decode(&transaction)
-        if err != nil {
-            return nil, err
-        }
-        transactions = append(transactions, transaction)
-    }
-
-    return transactions, nil
 }
