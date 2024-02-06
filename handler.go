@@ -640,3 +640,26 @@ func getTransactionByNumber(transaksiNumber int) (Transaction, error) {
 
     return transaction, nil
 }
+func getTransactionsByUser(userPhone string) ([]Transaction, error) {
+    var transactions []Transaction
+
+    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+    filter := bson.M{"user_phone": userPhone}
+    cursor, err := collection.Find(context.Background(), filter)
+    if err != nil {
+        return nil, err
+    }
+    defer cursor.Close(context.Background())
+
+    for cursor.Next(context.Background()) {
+        var transaction Transaction
+        err := cursor.Decode(&transaction)
+        if err != nil {
+            return nil, err
+        }
+        transactions = append(transactions, transaction)
+    }
+
+    return transactions, nil
+}
