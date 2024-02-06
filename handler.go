@@ -61,29 +61,72 @@ func closeMongoClient() {
 		}
 	}
 }
-
+type Transaction struct {
+    TransaksiNumber int    `bson:"transaksi_number"`
+    PaymentProof    string `bson:"payment_proof"`
+    UserPhone       string `bson:"user_phone"`
+    BuktiTf         string `bson:"buktitf"`
+    Timestamp       time.Time `bson:"timestamp"`
+    FormattedTime   string `bson:"formatted_time"`
+    Status          string `bson:"status"`
+}
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
-	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
-	// Get the current count of transactions to determine the transaction number
-	count, err := collection.CountDocuments(context.Background(), bson.M{})
-	if err != nil {
-		return err
-	}
+    count, err := collection.CountDocuments(context.Background(), bson.M{})
+    if err != nil {
+        return err
+    }
 
-	transaksiNumber := count + 1
+    transaksiNumber := count + 1
 
-	transaction := bson.M{
-		"transaksi_number": transaksiNumber,
-		"payment_proof":    paymentProof,
-		"user_phone":       userPhone,
-		"buktitf":          buktitf,
-		"timestamp":        time.Now().In(wib),
-		"formatted_time":   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
-	}
+    transaction := Transaction{
+        TransaksiNumber: transaksiNumber,
+        PaymentProof:    paymentProof,
+        UserPhone:       userPhone,
+        BuktiTf:         buktitf,
+        Timestamp:       time.Now().In(wib),
+        FormattedTime:   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+        Status:          "Pending", // Set status to Pending initially
+    }
 
-	_, err = collection.InsertOne(context.Background(), transaction)
-	return err
+    _, err = collection.InsertOne(context.Background(), transaction)
+    return err
+}
+func approvePayment(transaksiNumber int, isApproved bool) error {
+    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+    filter := bson.M{"transaksi_number": transaksiNumber}
+    update := bson.M{}
+
+    if isApproved {
+        update["$set"] = bson.M{"status": "Processing"}
+    } else {
+        update["$set"] = bson.M{"status": "Cancelled"}
+    }
+
+    _, err := collection.UpdateOne(context.Background(), filter, update)
+    return err
+}
+
+func informUserAboutPaymentStatus(transaksiNumber int, userPhone string, status string) error {
+    var message string
+
+    switch status {
+    case "Processing":
+        message = "Pembayaran Anda telah diterima dan sedang diproses."
+    case "Cancelled":
+        message = "Maaf, pembayaran Anda telah ditolak."
+    }
+
+    dt := &wa.TextMessage{
+        To:       userPhone,
+        IsGroup:  false,
+        Messages: message,
+    }
+
+    _, err := atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+    return err
 }
 func insertComplaintData(complaintContent string, userPhone string) error {
     collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
@@ -136,9 +179,6 @@ func getAllComplaints() ([]string, error) {
 
     return complaints, nil
 }
-
-
-// ...
 
 func getAllTransactions() ([]string, error) {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
@@ -460,12 +500,15 @@ func Post(w http.ResponseWriter, r *http.Request) {
 	
 				// Ensure that the client provides a valid image link
 				if strings.HasPrefix(paymentProof, "http") {
-					// Extract the image link from the message
 					buktitf := paymentProof
+	
+					err := insertTransactionData(paymentProof, msg.Phone_number, buktitf)
+					if err != nil {
+						fmt.Println("Error inserting transaction data into MongoDB:", err)
+					}
 	
 					adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
 					for _, adminPhoneNumber := range adminPhoneNumbers {
-						// Forward image link to admin
 						forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: https://wa.me/%s", paymentProof, msg.Phone_number)
 						forwardDT := &wa.TextMessage{
 							To:       adminPhoneNumber,
@@ -473,12 +516,6 @@ func Post(w http.ResponseWriter, r *http.Request) {
 							Messages: forwardMessage,
 						}
 						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
-					}
-	
-					// Insert transaction data into MongoDB
-					err := insertTransactionData(paymentProof, msg.Phone_number, buktitf)
-					if err != nil {
-						fmt.Println("Error inserting transaction data into MongoDB:", err)
 					}
 	
 					reply := "Terimakasih!!. Bukti pembayaran Anda telah kami terima. Silahkan tunggu proses verifikasi."
@@ -489,8 +526,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 				} else {
-					// Respond if the provided input is not a valid URL
-					reply := "salah cuyyy caranya itu: \n bayar [link bukti fotonya]"
+					reply := "Bukti pembayaran tidak valid. Silahkan masukkan link gambar bukti transfer."
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
@@ -498,8 +534,133 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 				}
-			} else {
-				resp.Response = "Command not recognized"
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "cekstatus") {
+					// Handle check status command
+					parts := strings.Fields(msg.Message)
+					if len(parts) == 1 {
+						// Get user's phone number
+						userPhone := msg.Phone_number
+		
+						// Retrieve user's transactions from MongoDB
+						transactions, err := getTransactionsByUser(userPhone)
+						if err != nil {
+							fmt.Println("Error retrieving user's transactions from MongoDB:", err)
+							return
+						}
+		
+						// Construct message with transaction details
+						var message string
+						if len(transactions) == 0 {
+							message = "Anda belum memiliki transaksi."
+						} else {
+							message = "Status Transaksi Anda:\n\n"
+							for _, transaction := range transactions {
+								message += fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nStatus: %s\n\n",
+									transaction.TransaksiNumber, transaction.FormattedTime, transaction.Status)
+							}
+						}
+		
+						// Send message to user
+						dt := &wa.TextMessage{
+							To:       userPhone,
+							IsGroup:  false,
+							Messages: message,
+						}
+						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
+					} else {
+						reply := "Format pesan tidak valid. Gunakan format: cekstatus"
+						ackDT := &wa.TextMessage{
+							To:       msg.Phone_number,
+							IsGroup:  false,
+							Messages: reply,
+						}
+						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+						return
+					}
+				} 
+			else if strings.HasPrefix(strings.ToLower(msg.Message), "setuju") || strings.HasPrefix(strings.ToLower(msg.Message), "tolak") {
+				// Handle admin approval or rejection of payment
+				parts := strings.Fields(msg.Message)
+				if len(parts) >= 3 {
+					transaksiNumber, err := strconv.Atoi(parts[1])
+					if err != nil {
+						reply := "Format pesan tidak valid. Gunakan format: setuju/tolak [nomor_transaksi]"
+						ackDT := &wa.TextMessage{
+							To:       msg.Phone_number,
+							IsGroup:  false,
+							Messages: reply,
+						}
+						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+						return
+					}
+	
+					isApproved := strings.ToLower(parts[0]) == "setuju"
+					err = approvePayment(transaksiNumber, isApproved)
+					if err != nil {
+						fmt.Println("Error updating payment status in MongoDB:", err)
+						return
+					}
+	
+					// Inform user about the payment status
+					transaction, err := getTransactionByNumber(transaksiNumber)
+					if err != nil {
+						fmt.Println("Error retrieving transaction data from MongoDB:", err)
+						return
+					}
+	
+					err = informUserAboutPaymentStatus(transaction.TransaksiNumber, transaction.UserPhone, transaction.Status)
+					if err != nil {
+						fmt.Println("Error sending payment status message to user:", err)
+					}
+				} else {
+					reply := "Format pesan tidak valid. Gunakan format: setuju/tolak [nomor_transaksi]"
+					ackDT := &wa.TextMessage{
+						To:       msg.Phone_number,
+						IsGroup:  false,
+						Messages: reply,
+					}
+					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					return
+				}
 			}
 		}
+	
+		json.NewEncoder(w).Encode(resp)
 	}
+	
+func getTransactionByNumber(transaksiNumber int) (Transaction, error) {
+    var transaction Transaction
+
+    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+    filter := bson.M{"transaksi_number": transaksiNumber}
+    err := collection.FindOne(context.Background(), filter).Decode(&transaction)
+    if err != nil {
+        return Transaction{}, err
+    }
+
+    return transaction, nil
+}
+func getTransactionsByUser(userPhone string) ([]Transaction, error) {
+    var transactions []Transaction
+
+    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+    filter := bson.M{"user_phone": userPhone}
+    cursor, err := collection.Find(context.Background(), filter)
+    if err != nil {
+        return nil, err
+    }
+    defer cursor.Close(context.Background())
+
+    for cursor.Next(context.Background()) {
+        var transaction Transaction
+        err := cursor.Decode(&transaction)
+        if err != nil {
+            return nil, err
+        }
+        transactions = append(transactions, transaction)
+    }
+
+    return transactions, nil
+}
