@@ -139,7 +139,29 @@ func insertComplaintData(complaintContent string, userPhone string) error {
     _, err = collection.InsertOne(context.Background(), complaint)
     return err
 }
+func getTransactionsByUserPhone(userPhone string) ([]string, error) {
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
+	cursor, err := collection.Find(context.Background(), bson.M{"user_phone": userPhone})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	var transactions []string
+	for cursor.Next(context.Background()) {
+		var transaction bson.M
+		err := cursor.Decode(&transaction)
+		if err != nil {
+			return nil, err
+		}
+		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nPayment Proof: %s\n status: %s\n\n",
+			transaction["transaksi_number"], transaction["formatted_time"], transaction["payment_proof"], transaction["status"])
+		transactions = append(transactions, transactionStr)
+	}
+
+	return transactions, nil
+}
 
 func getAllComplaints() ([]string, error) {
     collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
@@ -618,7 +640,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				
 					// Update the transaction status to completed with a value indicating that the payment was rejected
 					collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
-					_, err = collection.UpdateOne(context.Background(), bson.M{"transaksi_number": transaksiNumber}, bson.D{{"$set", bson.D{{"status", transaksiStatusCompleted}, {"payment_status", "rejected"}}}})
+					_, err = collection.UpdateOne(context.Background(), bson.M{"transaksi_number": transaksiNumber}, bson.D{{"$set", bson.D{{"status", transaksiStatusFailed}, {"payment_status", "rejected"}}}})
 					if err != nil {
 						fmt.Println("Error updating transaction status in MongoDB:", err)
 						reply := "Error updating transaction status. Please try again."
@@ -655,49 +677,91 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						Messages: reply,
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					// Send a confirmation message to the admin
+					adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
+					for _, adminPhoneNumber := range adminPhoneNumbers {
+						forwardMessage := fmt.Sprintf("Pembayaran dengan Transaksi Number [%d] sudah terkirimkan ke user [%s]", transaksiNumber, userPhone)
+						forwardDT := &wa.TextMessage{
+							To:       adminPhoneNumber,
+							IsGroup:  false,
+							Messages: forwardMessage,
+						}
+						_, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), forwardDT, "https://api.wa.my.id/api/send/message/text")
+					}
 				}else if strings.HasPrefix(strings.ToLower(msg.Message), "cekstatus") {
 					// Extract the transaction number from the message
 					transaksiNumberStr := strings.TrimPrefix(strings.ToLower(msg.Message), "cekstatus")
 					transaksiNumberStr = strings.TrimSpace(transaksiNumberStr)
 			
-					// Convert the transaction number to integer
-					transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
-					if err != nil {
-						// Handle invalid transaction number format
-						reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number."
+					var transactions []string
+					var err error
+					userPhone := msg.Phone_number
+
+					// If the user provides a transaction number, show the status for that transaction
+					if transaksiNumberStr != "" {
+						// Convert the transaction number to integer
+						transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
+						if err != nil {
+							// Handle invalid transaction number format
+							reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number or leave it empty to see all transactions."
+							ackDT := &wa.TextMessage{
+								To:       msg.Phone_number,
+								IsGroup:  false,
+								Messages: reply,
+							}
+							resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+							return
+						}
+			
+						// Get the transaction by its number
+						transaction, err := getTransactionByNumber(transaksiNumber)
+						if err != nil {
+							fmt.Println("Error retrieving transaction from MongoDB:", err)
+							reply := "Error retrieving transaction. Please try again."
+							ackDT := &wa.TextMessage{
+								To:       msg.Phone_number,
+								IsGroup:  false,
+								Messages: reply,
+							}
+							resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+							return
+						}
+			
+						// Send the transaction status message to the user
+						statusMessage := getTransactionStatusMessage(transaction)
+						reply := fmt.Sprintf("Your transaction status is:\n%s", statusMessage)
 						ackDT := &wa.TextMessage{
 							To:       msg.Phone_number,
 							IsGroup:  false,
 							Messages: reply,
 						}
-						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-						return
-					}
+						transactions = append(transactions, ackDT.Messages)
 			
-					// Get the transaction by its number
-					transaction, err := getTransactionByNumber(transaksiNumber)
-					if err != nil {
-						fmt.Println("Error retrieving transaction from MongoDB:", err)
-						reply := "Error retrieving transaction. Please try again."
-						ackDT := &wa.TextMessage{
-							To:       msg.Phone_number,
-							IsGroup:  false,
+					} else {
+						// Show all transactions for the user
+						transactions, err = getTransactionsByUserPhone(userPhone)
+						if err != nil {
+							fmt.Println("Error retrieving transactions from MongoDB:", err)
+							reply := "Error retrieving transactions. Please try again."
+							ackDT := &wa.TextMessage{
+								To:       msg.Phone_number,
+								IsGroup:  false,
 								Messages: reply,
+							}
+							resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+							return
 						}
-						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-						return
 					}
 			
-					// Send the transaction status message to the user
-					statusMessage := getTransactionStatusMessage(transaction)
-					reply := fmt.Sprintf("Your transaction status is:\n%s", statusMessage)
+					// Send the transaction history to the user
+					reply := "Your transaction history is:\n" + strings.Join(transactions, "\n")
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
 						Messages: reply,
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-				} else {
+				}else {
 				resp.Response = "Command not recognized"
 			}
 		}
