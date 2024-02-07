@@ -61,7 +61,18 @@ func closeMongoClient() {
 		}
 	}
 }
+// Transaction represents the structure of a transaction document in MongoDB
+type Transaction struct {
+	TransaksiNumber int       `bson:"transaksi_number"`
+	PaymentProof    string    `bson:"payment_proof"`
+	UserPhone       string    `bson:"user_phone"`
+	BuktiTF         string    `bson:"buktitf"`
+	Timestamp       time.Time `bson:"timestamp"`
+	FormattedTime   string    `bson:"formatted_time"`
+	Status          string    `bson:"status"`
+}
 
+// Function to insert transaction data into MongoDB
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
@@ -73,18 +84,68 @@ func insertTransactionData(paymentProof string, userPhone string, buktitf string
 
 	transaksiNumber := count + 1
 
-	transaction := bson.M{
-		"transaksi_number": transaksiNumber,
-		"payment_proof":    paymentProof,
-		"user_phone":       userPhone,
-		"buktitf":          buktitf,
-		"timestamp":        time.Now().In(wib),
-		"formatted_time":   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+	transaction := Transaction{
+		TransaksiNumber: transaksiNumber,
+		PaymentProof:    paymentProof,
+		UserPhone:       userPhone,
+		BuktiTF:         buktitf,
+		Timestamp:       time.Now().In(wib),
+		FormattedTime:   time.Now().In(wib).Format("Monday, 02-Jan-06 15:04:05 MST"),
+		Status:          "pending",
 	}
 
 	_, err = collection.InsertOne(context.Background(), transaction)
 	return err
 }
+// Function to update payment status by transaction number
+func updatePaymentStatus(transaksiNumber int, status string) error {
+	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+
+	// Update the payment status of the transaction
+	_, err := collection.UpdateOne(
+		context.Background(),
+		bson.M{"transaksi_number": transaksiNumber},
+		bson.M{"$set": bson.M{"status": status}},
+	)
+	return err
+}
+
+// Function to inform user about payment status
+func informUserAboutPaymentStatus(transaksiNumber int, userPhone string, status string) error {
+	var statusMessage string
+	switch status {
+	case "processing":
+		statusMessage = "Pembayaran Anda telah diterima dan sedang diproses."
+	case "rejected":
+		statusMessage = "Mohon maaf, pembayaran Anda tidak valid. Silakan coba lagi."
+	// Anda dapat menambahkan lebih banyak kasus untuk status yang berbeda jika diperlukan
+	default:
+		statusMessage = "Status pembayaran Anda: " + status
+	}
+
+	// Kirim pesan notifikasi ke pengguna
+	notification := &wa.TextMessage{
+		To:       userPhone,
+		IsGroup:  false,
+		Messages: statusMessage,
+	}
+	_, err := atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), notification, "https://api.wa.my.id/api/send/message/text")
+	return err
+}
+
+func handleTransactionError(err error, msg model.IteungMessage, errorMessage string) {
+	fmt.Println(errorMessage)
+	notification := &wa.TextMessage{
+		To:       msg.Phone_number,
+		IsGroup:  false,
+		Messages: errorMessage,
+	}
+	_, err = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), notification, "https://api.wa.my.id/api/send/message/text")
+	if err != nil {
+		fmt.Println("Error sending error notification:", err)
+	}
+}
+
 func insertComplaintData(complaintContent string, userPhone string) error {
     collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
@@ -453,7 +514,38 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			}
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
+			} else if  strings.HasPrefix(strings.ToLower(msg.Message), "setuju") || strings.HasPrefix(strings.ToLower(msg.Message), "tolak") {
+				parts := strings.Fields(strings.ToLower(msg.Message))
+				if len(parts) >= 3 {
+					transaksiNumber, err := strconv.Atoi(parts[1])
+					if err != nil {
+						handleTransactionError(err, msg, "Invalid transaction number format.")
+						return
+					}
+	
+					isApproved := strings.ToLower(parts[0]) == "setuju"
+					var status string
+					if isApproved {
+						status = "processing"
+					} else {
+						status = "rejected"
+					}
+	
+					// Perbarui status pembayaran di MongoDB
+					err = updatePaymentStatus(transaksiNumber, status)
+					if err != nil {
+						handleTransactionError(err, msg, "Error updating payment status.")
+						return
+					}
+	
+					// Beri tahu pengguna tentang status pembayaran
+					err = informUserAboutPaymentStatus(transaksiNumber, msg.Phone_number, status)
+					if err != nil {
+						handleTransactionError(err, msg, "Error informing user about payment status.")
+						return
+					}
+				}
+				} else if strings.HasPrefix(strings.ToLower(msg.Message), "bayar") || strings.HasPrefix(strings.ToLower(msg.Message), "pembayaran") {
 				paymentProof := strings.TrimPrefix(strings.ToLower(msg.Message), "bayar")
 				paymentProof = strings.TrimPrefix(paymentProof, "pembayaran")
 				paymentProof = strings.TrimSpace(paymentProof)
