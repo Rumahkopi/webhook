@@ -23,7 +23,6 @@ const (
 	mongoConnectionString   = "mongodb+srv://Syahid25:4yyoi59f6p8GKGHT@syahid.jirstmg.mongodb.net/"
 	mongoDBName             = "proyek3"
 	mongoCollectionName     = "keluhan"
-	transaksiCollectionName = "transaksi"
 )
 
 // MongoDB client
@@ -62,7 +61,6 @@ func closeMongoClient() {
 	}
 }
 const (
-	// ...
 	transaksiCollectionName = "transaksi"
 	transaksiStatusPending  = "pending"
 	transaksiStatusProcessing = "processing"
@@ -170,7 +168,6 @@ func getAllTransactions() ([]string, error) {
 
 	return transactions, nil
 }
-
 
 func deleteComplaintByContent(complaintContent string) error {
     collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
