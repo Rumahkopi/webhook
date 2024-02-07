@@ -269,7 +269,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli") {
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "pesanan") {
 				// Echo back the user's message
 				reply := "kamu sudah yakin dengan :\n" + msg.Message + "\nkamu bisa bayar melalui:\nBank BCA: 321321312 \nNo Dana: 088883211232\nNo Gopay: 088883211232 \nJika Kamu sudah membayarkan kamu bisa lakukan :\n bayar [link bukti screenshot transfer]\n\nJika Kamu Kesulitan bisa chat kontak support berikut ini:\nhttps://wa.me/6285312924192\nhttps://wa.me/6283174845017"
 			
