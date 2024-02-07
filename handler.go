@@ -62,10 +62,10 @@ func closeMongoClient() {
 }
 const (
 	transaksiCollectionName = "transaksi"
-	transaksiStatusPending  = "pending"
-	transaksiStatusProcessing = "processing"
-	transaksiStatusCompleted  = "completed"
-	transaksiStatusFailed    = "failed"
+	transaksiStatusPending  = "Pending"
+	transaksiStatusProcessing = "Proses"
+	transaksiStatusCompleted  = "Completed"
+	transaksiStatusFailed    = "Gagal"
 )
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
@@ -103,13 +103,13 @@ func getTransactionStatusMessage(transaction bson.M) string {
 	var statusMessage string
 	switch transaction["status"].(string) {
 	case transaksiStatusPending:
-		statusMessage = "Your transaction is pending."
+		statusMessage = "Transaksi kamu sedang Pending."
 	case transaksiStatusProcessing:
-		statusMessage = "Your transaction is being processed."
+		statusMessage = "Transaksi kamu sedang Proses."
 	case transaksiStatusCompleted:
-		statusMessage = "Your transaction has been completed."
+		statusMessage = "Transaksi kamu sudah Completed."
 	case transaksiStatusFailed:
-		statusMessage = "Your transaction has failed."
+		statusMessage = "Transaksi kamu Gagal."
 	default:
 		statusMessage = "Unknown transaction status."
 	}
@@ -155,14 +155,61 @@ func getTransactionsByUserPhone(userPhone string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nPayment Proof: %s\n status: %s\n\n",
+		transactionStr := fmt.Sprintf("Transaksi Number: %v\nTimestamp: %v\nPayment Proof: %s\nStatus: %s\n\n",
 			transaction["transaksi_number"], transaction["formatted_time"], transaction["payment_proof"], transaction["status"])
 		transactions = append(transactions, transactionStr)
 	}
 
 	return transactions, nil
 }
+//
+// Function to update transaction status to completed if it's been 1x24 jam since the transaction was created
+func updateTransactionStatusToCompleted() {
+    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
+    // Get all transactions with status pending
+    cursor, err := collection.Find(context.Background(), bson.M{"status": transaksiStatusPending})
+    if err != nil {
+        fmt.Println("Error retrieving transactions from MongoDB:", err)
+        return
+    }
+    defer cursor.Close(context.Background())
+
+    // Loop through all transactions
+    for cursor.Next(context.Background()) {
+        var transaction bson.M
+        err := cursor.Decode(&transaction)
+        if err != nil {
+            fmt.Println("Error decoding transaction:", err)
+            continue
+        }
+
+        // Calculate the time difference between the current time and the transaction timestamp
+        duration := time.Since(transaction["timestamp"].(time.Time))
+
+        // If the time difference is more than 1x24 jam, update the transaction status to completed
+        if duration > 24*time.Hour {
+            _, err := collection.UpdateOne(context.Background(), bson.M{"transaksi_number": transaction["transaksi_number"]}, bson.D{{"$set", bson.D{{"status", transaksiStatusCompleted}}}})
+            if err != nil {
+                fmt.Println("Error updating transaction status in MongoDB:", err)
+            }
+        }
+    }
+
+    // Check for any errors
+    if err := cursor.Err(); err != nil {
+        fmt.Println("Error retrieving transactions from MongoDB:", err)
+    }
+}
+
+// Call the function periodically to update transaction status
+go func() {
+    for {
+        updateTransactionStatusToCompleted()
+        time.Sleep(24 * time.Hour)
+    }
+}()
+//
 func getAllComplaints() ([]string, error) {
     collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
 
@@ -188,9 +235,6 @@ func getAllComplaints() ([]string, error) {
 
     return complaints, nil
 }
-
-
-// ...
 
 func getAllTransactions() ([]string, error) {
 	collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
@@ -441,7 +485,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				transaksiNumberToDelete, err := strconv.Atoi(transaksiNumberToDeleteStr)
 				if err != nil {
 					// Handle invalid Transaksi Number format
-					reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number."
+					reply := "salah caranya weh , berikut caranya\ndeletebayar [idnya]"
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
@@ -464,7 +508,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 	
-				adminReply := fmt.Sprintf("Transaction with Transaksi Number '%d' successfully deleted.", transaksiNumberToDelete)
+				adminReply := fmt.Sprintf("transaksi dengan id '%d' berhasil di hapus.", transaksiNumberToDelete)
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
 					IsGroup:  false,
@@ -496,7 +540,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 	
-				adminReply := "All transactions successfully deleted."
+				adminReply := "Semua transaksi berhasil terhapus."
 				adminDT := &wa.TextMessage{
 					To:       msg.Phone_number,
 					IsGroup:  false,
@@ -558,7 +602,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
 					if err != nil {
 						// Handle invalid transaction number format
-						reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number."
+						reply := "Format kamu salah harusnya: \napprovebayar [idnya]"
 						ackDT := &wa.TextMessage{
 							To:       msg.Phone_number,
 							IsGroup:  false,
@@ -600,7 +644,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						
 							// Send a confirmation message to the user
 							userPhone := transaction["user_phone"].(string)
-							reply := fmt.Sprintf("Selamat!! Pembayaran Anda telah kami terima dan akan segera diproses. Terima kasih telah berbelanja di Rumah Kopi.")
+							reply := fmt.Sprintf("Selamat!! Pembayaran Anda telah kami terima dan akan segera diproses. kamu bisa cek status mu melalui perintah :\ncekstatus")
 							ackDT := &wa.TextMessage{
 								To:       userPhone,
 								IsGroup:  false,
@@ -628,7 +672,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
 					if err != nil {
 						// Handle invalid transaction number format
-						reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number."
+						reply := "Format kamu salah harusnya: \nrejectbayar [idnya]"
 						ackDT := &wa.TextMessage{
 							To:       msg.Phone_number,
 							IsGroup:  false,
@@ -670,7 +714,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				
 					// Send a message to the user indicating that the payment has been rejected
 					userPhone := transaction["user_phone"].(string)
-					reply := fmt.Sprintf("Maaf!! Pembayaran Anda telah kami tolak. Silahkan coba lagi.")
+					reply := fmt.Sprintf("Maaf!! Pembayaran Anda lalukan itu tidak sesuai maka kami tolak. Silahkan lakukan transaksi ulang ya...")
 					ackDT := &wa.TextMessage{
 						To:       userPhone,
 						IsGroup:  false,
@@ -703,7 +747,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
 						if err != nil {
 							// Handle invalid transaction number format
-							reply := "Invalid Transaksi Number format. Please provide a valid Transaksi Number or leave it empty to see all transactions."
+							reply := "format kamu salah weh!"
 							ackDT := &wa.TextMessage{
 								To:       msg.Phone_number,
 								IsGroup:  false,
@@ -729,7 +773,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			
 						// Send the transaction status message to the user
 						statusMessage := getTransactionStatusMessage(transaction)
-						reply := fmt.Sprintf("Your transaction status is:\n%s", statusMessage)
+						reply := fmt.Sprintf("Berikut adalah status transaksi kamu :\n%s", statusMessage)
 						ackDT := &wa.TextMessage{
 							To:       msg.Phone_number,
 							IsGroup:  false,
@@ -754,14 +798,72 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 			
 					// Send the transaction history to the user
-					reply := "Your transaction history is:\n" + strings.Join(transactions, "\n")
+					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n")
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
 						Messages: reply,
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-				}else {
+					} else if strings.HasPrefix(strings.ToLower(msg.Message), "sampai") {
+						// Extract the transaction number from the message
+						transaksiNumberStr := strings.TrimPrefix(strings.ToLower(msg.Message), "sampai")
+						transaksiNumberStr = strings.TrimSpace(transaksiNumberStr)
+					
+						// Convert the transaction number to integer
+						transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
+						if err != nil {
+							// Handle invalid transaction number format
+							reply := "salah caranya kak , caranya adalah :\nsampai [number riwayat transaksi]"
+							ackDT := &wa.TextMessage{
+								To:       msg.Phone_number,
+								IsGroup:  false,
+								Messages: reply,
+							}
+							resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+							return
+						}
+					
+						// Update the transaction status to completed
+						collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
+						_, err = collection.UpdateOne(context.Background(), bson.M{"transaksi_number": transaksiNumber}, bson.D{{"$set", bson.D{{"status", transaksiStatusCompleted}}}})
+						if err != nil {
+							fmt.Println("Error updating transaction status in MongoDB:", err)
+							reply := "Error updating transaction status. Please try again."
+							ackDT := &wa.TextMessage{
+								To:       msg.Phone_number,
+								IsGroup:  false,
+								Messages: reply,
+							}
+							resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+							return
+						}
+					
+						// Find the transaction by transaction number
+						var transaction bson.M
+						err = collection.FindOne(context.Background(), bson.M{"transaksi_number": transaksiNumber}).Decode(&transaction)
+						if err != nil {
+							fmt.Println("Error retrieving transaction from MongoDB:", err)
+							reply := "Error retrieving transaction. Please try again."
+							ackDT := &wa.TextMessage{
+								To:       msg.Phone_number,
+								IsGroup:  false,
+								Messages: reply,
+							}
+							resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+							return
+						}
+					
+						// Send a message to the user indicating that the transaction is completed
+						userPhone := transaction["user_phone"].(string)
+						reply := fmt.Sprintf("transaksi kamu dengan number %d telah di selesaikan.", transaksiNumber)
+						ackDT := &wa.TextMessage{
+							To:       userPhone,
+							IsGroup:  false,
+							Messages: reply,
+						}
+						resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
+					}else {
 				resp.Response = "Command not recognized"
 			}
 		}
