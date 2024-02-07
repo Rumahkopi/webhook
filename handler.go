@@ -163,42 +163,49 @@ func getTransactionsByUserPhone(userPhone string) ([]string, error) {
 	return transactions, nil
 }
 //
-// Function to update transaction status to completed if it's been 1x24 jam since the transaction was created
+type TransactionFilter struct {
+    Status string
+}
+
 func updateTransactionStatusToCompleted() {
     collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
 
     // Get all transactions with status pending
-    cursor, err := collection.Find(context.Background(), bson.M{"status": transaksiStatusPending})
+    filter := TransactionFilter{Status: transaksiStatusPending}
+    cursor, err := collection.Find(context.Background(), filter)
     if err != nil {
-        fmt.Println("Error retrieving transactions from MongoDB:", err)
+        log.Println("Error retrieving transactions from MongoDB:", err)
         return
     }
     defer cursor.Close(context.Background())
 
     // Loop through all transactions
     for cursor.Next(context.Background()) {
-        var transaction bson.M
+        var transaction Transaction
         err := cursor.Decode(&transaction)
         if err != nil {
-            fmt.Println("Error decoding transaction:", err)
+            log.Println("Error decoding transaction:", err)
             continue
         }
 
         // Calculate the time difference between the current time and the transaction timestamp
-        duration := time.Since(transaction["timestamp"].(time.Time))
+        duration := time.Since(transaction.Timestamp)
 
-        // If the time difference is more than 1x24 jam, update the transaction status to completed
+        // If the time difference is more than 24 hours, update the transaction status to completed
         if duration > 24*time.Hour {
-            _, err := collection.UpdateOne(context.Background(), bson.M{"transaksi_number": transaction["transaksi_number"]}, bson.D{{"$set", bson.D{{"status", transaksiStatusCompleted}}}})
+            update := bson.D{{"$set", bson.D{{"status", transaksiStatusCompleted}}}}
+            result, err := collection.UpdateOne(context.Background(), filter, update)
             if err != nil {
-                fmt.Println("Error updating transaction status in MongoDB:", err)
+                log.Println("Error updating transaction status in MongoDB:", err)
+            } else if result.MatchedCount == 0 {
+                log.Println("No matching transactions found to update")
             }
         }
     }
 
     // Check for any errors
     if err := cursor.Err(); err != nil {
-        fmt.Println("Error retrieving transactions from MongoDB:", err)
+        log.Println("Error retrieving transactions from MongoDB:", err)
     }
 }
 
