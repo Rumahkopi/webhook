@@ -244,7 +244,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				fmt.Println("Error inserting complaint data into MongoDB:", err)
 			}
 
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				forwardMessage := fmt.Sprintf("Ada Masalah Baru:\n%s\nDari: https://wa.me/%s", complaintContent, msg.Phone_number)
 				forwardDT := &wa.TextMessage{
@@ -263,7 +263,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "listkeluhan") {
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -289,7 +289,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deletekeluhan") {
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -325,7 +325,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallkeluhan") {
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -351,7 +351,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		} else 	if strings.HasPrefix(strings.ToLower(msg.Message), "listbayar") {
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -377,7 +377,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp.Response = "You are not authorized to access this command."
 			}
 		}else if strings.HasPrefix(strings.ToLower(msg.Message), "deletebayar") {
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -426,7 +426,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), adminDT, "https://api.wa.my.id/api/send/message/text")
 			}
 		}else if strings.HasPrefix(strings.ToLower(msg.Message), "deleteallbayar") {
-			adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+			adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 			isAdmin := false
 			for _, adminPhoneNumber := range adminPhoneNumbers {
 				if msg.Phone_number == adminPhoneNumber {
@@ -467,7 +467,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					// Extract the image link from the message
 					buktitf := paymentProof
 			
-					adminPhoneNumbers := []string{"6283174845017", "6285312924193"}
+					adminPhoneNumbers := []string{"6283174845017", "6285312924192"}
 					for _, adminPhoneNumber := range adminPhoneNumbers {
 						// Forward image link to admin
 						forwardMessage := fmt.Sprintf("Bukti Pembayaran Baru:\n%s\nDari: https://wa.me/%s", paymentProof, msg.Phone_number)
