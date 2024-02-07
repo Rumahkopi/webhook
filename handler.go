@@ -163,59 +163,6 @@ func getTransactionsByUserPhone(userPhone string) ([]string, error) {
 	return transactions, nil
 }
 //
-type TransactionFilter struct {
-    Status string
-}
-
-func updateTransactionStatusToCompleted() {
-    collection := mongoClient.Database(mongoDBName).Collection(transaksiCollectionName)
-
-    // Get all transactions with status pending
-    filter := TransactionFilter{Status: transaksiStatusPending}
-    cursor, err := collection.Find(context.Background(), filter)
-    if err != nil {
-        log.Println("Error retrieving transactions from MongoDB:", err)
-        return
-    }
-    defer cursor.Close(context.Background())
-
-    // Loop through all transactions
-    for cursor.Next(context.Background()) {
-        var transaction Transaction
-        err := cursor.Decode(&transaction)
-        if err != nil {
-            log.Println("Error decoding transaction:", err)
-            continue
-        }
-
-        // Calculate the time difference between the current time and the transaction timestamp
-        duration := time.Since(transaction.Timestamp)
-
-        // If the time difference is more than 24 hours, update the transaction status to completed
-        if duration > 24*time.Hour {
-            update := bson.D{{"$set", bson.D{{"status", transaksiStatusCompleted}}}}
-            result, err := collection.UpdateOne(context.Background(), filter, update)
-            if err != nil {
-                log.Println("Error updating transaction status in MongoDB:", err)
-            } else if result.MatchedCount == 0 {
-                log.Println("No matching transactions found to update")
-            }
-        }
-    }
-
-    // Check for any errors
-    if err := cursor.Err(); err != nil {
-        log.Println("Error retrieving transactions from MongoDB:", err)
-    }
-}
-
-// Call the function periodically to update transaction status
-go func() {
-    for {
-        updateTransactionStatusToCompleted()
-        time.Sleep(24 * time.Hour)
-    }
-}()
 //
 func getAllComplaints() ([]string, error) {
     collection := mongoClient.Database(mongoDBName).Collection(mongoCollectionName)
