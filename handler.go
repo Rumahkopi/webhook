@@ -64,7 +64,7 @@ const (
 	transaksiCollectionName = "transaksi"
 	transaksiStatusPending  = "Pending"
 	transaksiStatusProcessing = "Proses"
-	transaksiStatusCompleted  = "Completed"
+	transaksiStatusCompleted  = "Sukses"
 	transaksiStatusFailed    = "Gagal"
 )
 func insertTransactionData(paymentProof string, userPhone string, buktitf string) error {
@@ -107,7 +107,7 @@ func getTransactionStatusMessage(transaction bson.M) string {
 	case transaksiStatusProcessing:
 		statusMessage = "Transaksi kamu sedang Proses."
 	case transaksiStatusCompleted:
-		statusMessage = "Transaksi kamu sudah Completed."
+		statusMessage = "Transaksi kamu sudah Sukses."
 	case transaksiStatusFailed:
 		statusMessage = "Transaksi kamu Gagal."
 	default:
@@ -752,23 +752,23 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 			
 					// Send the transaction history to the user
-					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n\nJika sudah sampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\nsampai [id nomer riwayat transaksi]")
+					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n\nJika sudah pesanansampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\npesanansampai [id nomer riwayat transaksi]")
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
 						Messages: reply,
 					}
 					resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), ackDT, "https://api.wa.my.id/api/send/message/text")
-					} else if strings.HasPrefix(strings.ToLower(msg.Message), "sampai") {
+					} else if strings.HasPrefix(strings.ToLower(msg.Message), "pesanansampai") {
 						// Extract the transaction number from the message
-						transaksiNumberStr := strings.TrimPrefix(strings.ToLower(msg.Message), "sampai")
+						transaksiNumberStr := strings.TrimPrefix(strings.ToLower(msg.Message), "pesanansampai")
 						transaksiNumberStr = strings.TrimSpace(transaksiNumberStr)
 					
 						// Convert the transaction number to integer
 						transaksiNumber, err := strconv.Atoi(transaksiNumberStr)
 						if err != nil {
 							// Handle invalid transaction number format
-							reply := "salah caranya kak , caranya adalah :\nsampai [number riwayat transaksi]"
+							reply := "salah caranya kak , caranya adalah :\npesanansampai [number riwayat transaksi]"
 							ackDT := &wa.TextMessage{
 								To:       msg.Phone_number,
 								IsGroup:  false,
