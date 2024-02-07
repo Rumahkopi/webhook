@@ -798,7 +798,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 			
 					// Send the transaction history to the user
-					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n")
+					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n\nJika sudah sampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\nsampai [id nomer riwayat transaksi]")
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
