@@ -269,9 +269,9 @@ func Post(w http.ResponseWriter, r *http.Request) {
 				Messages: reply,
 			}
 			resp, _ = atapi.PostStructWithToken[atmessage.Response]("Token", os.Getenv("TOKEN"), dt, "https://api.wa.my.id/api/send/message/text")
-			} else if strings.HasPrefix(strings.ToLower(msg.Message), "pesanan") {
+			} else if strings.HasPrefix(strings.ToLower(msg.Message), "beli") {
 				// Echo back the user's message
-				reply := "kamu sudah yakin dengan :\n" + msg.Message + "\nkamu bisa bayar melalui:\nBank BCA: 321321312 \nNo Dana: 088883211232\nNo Gopay: 088883211232 \nJika Kamu sudah membayarkan kamu bisa lakukan :\n bayar [link bukti screenshot transfer]\n\nJika Kamu Kesulitan bisa chat kontak support berikut ini:\nhttps://wa.me/6285312924192\nhttps://wa.me/6283174845017"
+				reply := "Kamu sudah yakin dengan :\n" + msg.Message + "\nKamu bisa bayar melalui:\nBank BCA: 321321312 \nNo Dana: 088883211232\nNo Gopay: 088883211232 \nJika Kamu sudah membayarkan kamu bisa lakukan :\n bayar [link bukti screenshot transfer]\n\nJika Kamu Kesulitan bisa chat kontak support berikut ini:\nhttps://wa.me/6285312924192\nhttps://wa.me/6283174845017"
 			
 				dt := &wa.TextMessage{
 					To:       msg.Phone_number,
@@ -598,7 +598,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						
 							// Send a confirmation message to the user
 							userPhone := transaction["user_phone"].(string)
-							reply := fmt.Sprintf("Selamat!! Pembayaran Anda telah kami terima dan akan segera diproses. kamu bisa cek status mu melalui perintah :\ncekstatus")
+							reply := fmt.Sprintf("Selamat!! Pembayaran Anda telah kami terima dan akan segera diproses. kamu bisa cek statusmu melalui perintah :\ncekstatus")
 							ackDT := &wa.TextMessage{
 								To:       userPhone,
 								IsGroup:  false,
@@ -752,7 +752,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 			
 					// Send the transaction history to the user
-					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n\nJika sudah pesanansampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\npesanansampai [id nomer riwayat transaksi]")
+					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n\nJika sudah pesanan sampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\npesanansampai [id nomer riwayat transaksi]")
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
