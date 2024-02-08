@@ -598,7 +598,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 						
 							// Send a confirmation message to the user
 							userPhone := transaction["user_phone"].(string)
-							reply := fmt.Sprintf("Selamat!! Pembayaran Anda telah kami terima dan akan segera diproses. kamu bisa cek statusmu melalui perintah :\ncekstatus")
+							reply := fmt.Sprintf("Selamat!! Pembayaran Anda telah kami terima dan akan segera diproses dan akan kita kirimkan. kamu bisa cek statusmu melalui perintah :\ncekstatus")
 							ackDT := &wa.TextMessage{
 								To:       userPhone,
 								IsGroup:  false,
@@ -752,7 +752,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 					}
 			
 					// Send the transaction history to the user
-					reply := "Berikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n\nJika sudah pesanan sampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\npesanansampai [id nomer riwayat transaksi]")
+					reply := "Jika sudah pesanan sampai kamu bisa gunakan perintah berikut ini untuk menyelesaikan status pengiriman:\npesanansampai [id nomer riwayat transaksi]\nBerikut adalah riwayat transaksi kamu:\n" + strings.Join(transactions, "\n")
 					ackDT := &wa.TextMessage{
 						To:       msg.Phone_number,
 						IsGroup:  false,
